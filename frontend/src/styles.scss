@@ -1,70 +1,100 @@
-/* Global Styles for HRbot */
+/* Global Styles for HRbot - Futuristic Lab Theme */
 @import '@angular/material/prebuilt-themes/indigo-pink.css';
 
 :root {
-    --background-color: #0f172a;
+    /* Base Colors - Spatial UI */
+    --background-color: #f8fafc;
+    --background-gradient: radial-gradient(circle at 50% 50%, #f8fafc 0%, #edf2f7 100%);
+
+    /* Specific User Tokens */
+    --ai-blue: #3B82F6;
+    /* Accent Blue */
+    --ai-glow: rgba(59, 130, 246, 0.25);
+
+    /* Glass Tokens */
+    --glass-bg: rgba(255, 255, 255, 0.6);
+    --glass-border: 1px solid rgba(96, 165, 250, 0.3);
+    --glass-blur: blur(20px);
+
+    /* Surface - Frosted Glass */
+    --surface-color: var(--glass-bg);
+    --surface-border: var(--glass-border);
+
+    /* Accents */
+    --primary-color: var(--ai-blue);
+    --primary-glow: 0 0 30px var(--ai-glow);
+
+    /* Text */
+    --text-color: #0f172a;
     /* Slate 900 */
-    --surface-color: #1e293b;
-    /* Slate 800 */
-    --primary-color: #38bdf8;
-    /* Sky 400 */
-    --accent-color: #f472b6;
-    /* Pink 400 */
-    --text-color: #f8fafc;
-    /* Slate 50 */
-    --text-secondary: #94a3b8;
-    /* Slate 400 */
-    --border-radius-lg: 16px;
-    --border-radius-md: 8px;
-    --header-height: 64px;
+    --text-secondary: #64748b;
+    /* Slate 500 */
+
+    /* Layout */
+    --header-height: 70px;
+    --border-radius-lg: 24px;
+    --border-radius-md: 16px;
+    --shadow-floating: 0 20px 50px -12px rgba(15, 23, 42, 0.1);
+
+    /* Spacing */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 40px;
 }
 
 body {
     margin: 0;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    background-color: var(--background-color);
+    background: var(--background-gradient);
     color: var(--text-color);
     height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
-
-* {
-    box-sizing: border-box;
-}
-
-.content-container {
-    flex: 1;
-    display: flex;
     overflow: hidden;
-    height: calc(100vh - var(--header-height));
+    /* Immersive feel */
 }
 
 /* Utilities */
+.content-container {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    padding-top: var(--header-height);
+    /* Prevent header overlap */
+    overflow: hidden;
+}
+
 .glass {
-    background: rgba(30, 41, 59, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    /* border: var(--glass-border); */
+    /* Removed outline */
+    box-shadow: var(--shadow-floating);
 }
 
-.neon-glow {
-    box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+.floating-panel {
+    @extend .glass;
+    border-radius: var(--border-radius-lg);
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    /* Smooth ease-out */
 }
 
-::-webkit-scrollbar {
-    width: 6px;
+/* Typography Helpers used in futuristic UI */
+.text-h1 {
+    font-weight: 300;
+    letter-spacing: -1px;
 }
 
-::-webkit-scrollbar-track {
-    background: transparent;
+.text-h2 {
+    font-weight: 500;
+    letter-spacing: -0.5px;
 }
 
-::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2);
+.text-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
 }

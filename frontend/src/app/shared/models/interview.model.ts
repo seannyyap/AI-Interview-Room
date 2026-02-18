@@ -1,5 +1,17 @@
+export enum Role {
+    AI = 'ai',
+    USER = 'user'
+}
+
+export enum InterviewStatus {
+    IDLE = 'idle',
+    LISTENING = 'listening',
+    SPEAKING = 'speaking',
+    PROCESSING = 'processing'
+}
+
 export interface Message {
-    role: 'ai' | 'user';
+    role: Role;
     text: string;
     timestamp: string;
 }

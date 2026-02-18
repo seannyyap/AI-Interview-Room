@@ -1,16 +1,15 @@
 import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
-import { Role, InterviewStatus } from '../../../../shared/models/interview.model';
 import { InterviewStore } from '../../interview.store';
+import { InterviewStatus } from '../../../../shared/models/interview.model';
 
 @Component({
-  selector: 'app-transcript',
+  selector: 'app-interview-console',
   standalone: false,
-  templateUrl: './transcript.html',
-  styleUrl: './transcript.scss',
+  templateUrl: './interview-console.html',
+  styleUrl: './interview-console.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class TranscriptComponent {
+export class InterviewConsoleComponent {
   readonly store = inject(InterviewStore);
-  readonly Role = Role;
   readonly InterviewStatus = InterviewStatus;
 }

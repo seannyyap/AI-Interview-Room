@@ -1,76 +1,91 @@
-.avatar-container {
-    position: relative;
+.orb-container {
     width: 300px;
     height: 300px;
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    /* Immersive glow behind the orb */
+    filter: drop-shadow(0 0 50px rgba(37, 99, 235, 0.3));
 }
 
-.ball {
-    width: 120px;
-    height: 120px;
-    background: radial-gradient(circle at 30% 30%, var(--primary-color), #0ea5e9);
+.orb-core {
+    width: 140px;
+    height: 140px;
     border-radius: 50%;
     position: relative;
-    z-index: 2;
-    box-shadow: 0 0 50px rgba(56, 189, 248, 0.4),
-        inset -10px -10px 20px rgba(0, 0, 0, 0.2);
-    transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+    /* Base Appearance */
+    background: radial-gradient(circle at 30% 30%, #fff 0%, #cbd5e1 40%, #94a3b8 100%);
+    box-shadow:
+        inset -10px -10px 20px rgba(15, 23, 42, 0.2),
+        inset 10px 10px 20px rgba(255, 255, 255, 1),
+        0 0 40px var(--ai-glow);
+
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Idle State: Slow Breathing */
+    animation: breathe 5s ease-in-out infinite;
+
+    &.listening {
+        /* Listening: Blue Tint + Ripples */
+        background: radial-gradient(circle at 30% 30%, #fff 0%, #e0f2fe 30%, var(--ai-blue) 100%);
+        box-shadow: 0 0 60px var(--ai-glow);
+        transform: scale(1.05);
+
+        .rings-field .ring {
+            opacity: 0.5;
+            border-color: var(--ai-blue);
+            animation-duration: 2.5s;
+        }
+    }
+
+    &.speaking {
+        /* Speaking: Soft Glow Pulse (Warm/Pink accent or just brighter Blue? Spec says 'soft glow pulse') */
+        /* Let's keep it blue/white for 'Clean Lab' feel, or maybe subtle cyan */
+        background: radial-gradient(circle at 30% 30%, #fff 0%, #cffafe 20%, #06b6d4 100%);
+        box-shadow: 0 0 80px rgba(6, 182, 212, 0.5);
+        animation: speak-pulse 1.5s infinite ease-in-out alternate;
+        /* Soft pulse, not rapid */
+    }
 }
 
-.rings {
+.rings-field {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     width: 100%;
     height: 100%;
-    z-index: 1;
-}
+    pointer-events: none; // Ensure it doesn't block interactions if any
+    z-index: -1;
 
-.ring {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    border: 1px solid rgba(56, 189, 248, 0.2);
-    border-radius: 50%;
-    animation: ripple 4s infinite cubic-bezier(0, 0.2, 0.8, 1);
-
-    &:nth-child(2) {
-        animation-delay: -1s;
+    .ring {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        opacity: 0;
     }
 
-    &:nth-child(3) {
-        animation-delay: -2s;
-    }
-}
-
-.speaking .ball {
-    animation: breathe 2s infinite ease-in-out;
-    box-shadow: 0 0 80px rgba(244, 114, 182, 0.5),
-        inset -10px -10px 20px rgba(0, 0, 0, 0.2);
-    background: radial-gradient(circle at 30% 30%, var(--accent-color), #ec4899);
-}
-
-.speaking .ring {
-    border-color: rgba(244, 114, 182, 0.2);
-}
-
-@keyframes ripple {
-    0% {
-        width: 120px;
-        height: 120px;
-        opacity: 1;
-        border-width: 1px;
+    .r1 {
+        width: 180px;
+        height: 180px;
+        animation: ripple 3s infinite 0s;
     }
 
-    100% {
+    .r2 {
+        width: 240px;
+        height: 240px;
+        animation: ripple 3s infinite 1s;
+    }
+
+    .r3 {
         width: 300px;
         height: 300px;
-        opacity: 0;
-        border-width: 0.5px;
+        animation: ripple 3s infinite 2s;
     }
 }
 
@@ -82,7 +97,36 @@
     }
 
     50% {
+        transform: scale(1.05);
+    }
+}
+
+@keyframes speak-pulse {
+    0% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+
+    100% {
         transform: scale(1.15);
-        box-shadow: 0 0 100px rgba(244, 114, 182, 0.6);
+        filter: brightness(1.2);
+    }
+}
+
+@keyframes ripple {
+    0% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0;
+        border-color: rgba(255, 255, 255, 0.8);
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 0;
+        border-color: rgba(255, 255, 255, 0);
     }
 }

@@ -1,10 +1,12 @@
-<div class="avatar-container">
-    <div class="ball-wrapper" [class.speaking]="isSpeaking" [class.listening]="!isSpeaking">
-        <div class="ball"></div>
-        <div class="rings">
-            <div class="ring"></div>
-            <div class="ring"></div>
-            <div class="ring"></div>
+<div class="orb-container">
+    <div class="orb-core" [class.speaking]="isSpeaking()" [class.listening]="isListening()">
+
+        <div class="inner-light"></div>
+        <div class="outer-glow"></div>
+        <div class="rings-field">
+            <div class="ring r1"></div>
+            <div class="ring r2"></div>
+            <div class="ring r3"></div>
         </div>
     </div>
 </div>

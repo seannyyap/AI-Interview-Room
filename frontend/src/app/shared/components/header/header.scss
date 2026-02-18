@@ -1,87 +1,50 @@
-.header {
+.app-header {
     height: var(--header-height);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 var(--spacing-lg);
+    width: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
     z-index: 1000;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: var(--glass-border);
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
 
-    .logo {
+    .header-content {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0 var(--spacing-lg);
         display: flex;
         align-items: center;
-        gap: var(--spacing-sm);
-        font-size: 1.5rem;
-        font-weight: 700;
-        letter-spacing: -0.5px;
-        cursor: pointer;
 
-        .bot-icon {
-            font-size: 1.8rem;
-        }
-
-        .brand-name {
-            color: var(--text-color);
-
-            .highlight {
-                color: var(--primary-color);
-            }
-        }
-    }
-
-    .nav {
-        display: flex;
-        gap: var(--spacing-lg);
-
-        a {
+        .brand-logo {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
             text-decoration: none;
-            color: var(--text-secondary);
-            font-weight: 500;
-            font-size: 0.95rem;
-            transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            padding: 4px 0;
+            color: var(--text-color);
+            transition: transform 0.2s ease;
 
             &:hover {
-                color: var(--text-color);
+                transform: scale(1.02);
             }
 
-            &.active {
-                color: var(--primary-color);
+            .logo-svg {
+                width: 32px;
+                height: 32px;
+                color: var(--ai-blue);
+            }
 
-                &::after {
-                    content: '';
-                    position: absolute;
-                    bottom: -20px;
-                    left: 0;
-                    width: 100%;
-                    height: 2px;
-                    background: var(--primary-color);
-                    box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
-                }
+            .brand-text {
+                font-size: 1.25rem;
+                font-weight: 500;
+                letter-spacing: -0.5px;
             }
         }
-    }
 
-    .actions {
-        .btn-primary {
-            background: var(--primary-color);
-            color: #000;
-            border: none;
-            padding: 8px 20px;
-            border-radius: var(--border-radius-md);
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-
-            &:hover {
-                transform: translateY(-1px);
-                box-shadow: 0 4px 12px rgba(56, 189, 248, 0.4);
-            }
-
-            &:active {
-                transform: translateY(0);
-            }
+        .spacer {
+            flex: 1;
         }
     }
 }

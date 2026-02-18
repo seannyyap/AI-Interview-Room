@@ -1,0 +1,20 @@
+<div class="console-pill">
+    <div class="status-indicator">
+        <div class="dot" [class]="store.status()"></div>
+        <span class="status-label">{{ store.status() }}</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="controls">
+        <button class="control-btn" [class.active]="store.isMicrophoneActive()"
+            (click)="store.toggleMicrophone(!store.isMicrophoneActive())" title="Toggle Microphone">
+            <img [src]="!store.isMicrophoneActive() ? '/assets/icons/mic-off.svg' : '/assets/icons/mic-on.svg'"
+                class="icon-svg" alt="Mic">
+        </button>
+
+        <button class="control-btn end-call" (click)="store.reset()" title="End Interview">
+            <img src="/assets/icons/end-call.svg" class="icon-svg" alt="End">
+        </button>
+    </div>
+</div>

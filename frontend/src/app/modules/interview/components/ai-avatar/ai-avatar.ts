@@ -1,18 +1,18 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/core';
+import { InterviewStore } from '../../interview.store';
+import { InterviewStatus } from '../../../../shared/models/interview.model';
 
 @Component({
-  selector: 'app-ai-avatar',
+  selector: 'app-ai-orb',
   standalone: false,
   templateUrl: './ai-avatar.html',
-  styleUrl: './ai-avatar.scss'
+  styleUrl: './ai-avatar.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class AiAvatarComponent {
-  isSpeaking = false;
+export class AiOrbComponent {
+  readonly store = inject(InterviewStore);
 
-  constructor() {
-    // Simulate speaking/listening states for demo
-    setInterval(() => {
-      this.isSpeaking = !this.isSpeaking;
-    }, 5000);
-  }
+  // Computed signals for animation states
+  readonly isSpeaking = computed(() => this.store.status() === InterviewStatus.SPEAKING);
+  readonly isListening = computed(() => this.store.status() === InterviewStatus.LISTENING);
 }

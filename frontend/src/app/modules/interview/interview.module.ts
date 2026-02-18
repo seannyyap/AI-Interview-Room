@@ -4,20 +4,25 @@ import { RouterModule } from '@angular/router';
 
 import { INTERVIEW_ROUTES } from './interview.routes';
 import { InterviewComponent } from './pages/interview';
-import { AiAvatarComponent } from './components/ai-avatar/ai-avatar';
+import { AiOrbComponent } from './components/ai-avatar/ai-avatar';
 import { WebcamComponent } from './components/webcam/webcam';
 import { TranscriptComponent } from './components/transcript/transcript';
+import { InterviewConsoleComponent } from './components/interview-console/interview-console';
+
+import { SharedModule } from '../../shared/shared.module';
 
 @NgModule({
     declarations: [
         InterviewComponent,
-        AiAvatarComponent,
+        AiOrbComponent,
         WebcamComponent,
-        TranscriptComponent
+        TranscriptComponent,
+        InterviewConsoleComponent
     ],
     imports: [
         CommonModule,
-        RouterModule.forChild(INTERVIEW_ROUTES)
+        RouterModule.forChild(INTERVIEW_ROUTES),
+        SharedModule
     ],
     exports: [RouterModule]
 })

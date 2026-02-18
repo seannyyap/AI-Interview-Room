@@ -1,33 +1,24 @@
-<div class="interview-container">
-    <!-- Left/Center Section: AI Avatar -->
-    <section class="ai-section">
-        <div class="ai-content">
-            <app-ai-avatar></app-ai-avatar>
-            <div class="ai-status">
-                <span class="status-indicator live"></span>
-                <span class="status-text">HRbot is listening...</span>
-            </div>
-        </div>
-    </section>
+<div class="interview-spatial-layout">
 
-    <!-- Right Section: Transcript -->
-    <section class="sidebar-section">
+    <!-- CENTER: AI Core -->
+    <div class="orb-stage">
+        <app-ai-orb></app-ai-orb>
+        <div class="orb-reflection"></div>
+    </div>
+
+    <!-- BOTTOM: Control Deck -->
+    <div class="console-wrapper">
+        <app-interview-console></app-interview-console>
+    </div>
+
+    <!-- TOP RIGHT: Floating Transcript (Retractable) -->
+    <app-floating-glass-panel width="500px" height="auto" positionClass="top-right">
         <app-transcript></app-transcript>
+    </app-floating-glass-panel>
 
-        <!-- Bottom Right: Webcam Overlay -->
-        <div class="webcam-overlay glass neon-glow">
-            <app-webcam></app-webcam>
-        </div>
-    </section>
+    <!-- BOTTOM RIGHT: Floating Webcam -->
+    <app-floating-glass-panel width="320px" height="210px" positionClass="bottom-right">
+        <app-webcam></app-webcam>
+    </app-floating-glass-panel>
 
-    <!-- Bottom Controls -->
-    <footer class="controls-bar glass">
-        <button class="btn-control toggle-mic">
-            <span class="icon">🎤</span>
-        </button>
-        <button class="btn-control end-call">
-            <span class="icon">📞</span>
-            End Interview
-        </button>
-    </footer>
 </div>

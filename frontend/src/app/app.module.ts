@@ -3,7 +3,7 @@ import { BrowserModule } from '@angular/platform-browser';
 import { RouterModule, Routes } from '@angular/router';
 
 import { AppComponent } from './app';
-import { HeaderComponent } from './shared/components/header/header';
+import { SharedModule } from './shared/shared.module';
 
 const routes: Routes = [
     {
@@ -15,12 +15,12 @@ const routes: Routes = [
 
 @NgModule({
     declarations: [
-        AppComponent,
-        HeaderComponent
+        AppComponent
     ],
     imports: [
         BrowserModule,
-        RouterModule.forRoot(routes)
+        RouterModule.forRoot(routes),
+        SharedModule
     ],
     bootstrap: [AppComponent]
 })
