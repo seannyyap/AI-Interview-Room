@@ -1,0 +1,33 @@
+<div class="interview-container">
+    <!-- Left/Center Section: AI Avatar -->
+    <section class="ai-section">
+        <div class="ai-content">
+            <app-ai-avatar></app-ai-avatar>
+            <div class="ai-status">
+                <span class="status-indicator live"></span>
+                <span class="status-text">HRbot is listening...</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Right Section: Transcript -->
+    <section class="sidebar-section">
+        <app-transcript></app-transcript>
+
+        <!-- Bottom Right: Webcam Overlay -->
+        <div class="webcam-overlay glass neon-glow">
+            <app-webcam></app-webcam>
+        </div>
+    </section>
+
+    <!-- Bottom Controls -->
+    <footer class="controls-bar glass">
+        <button class="btn-control toggle-mic">
+            <span class="icon">🎤</span>
+        </button>
+        <button class="btn-control end-call">
+            <span class="icon">📞</span>
+            End Interview
+        </button>
+    </footer>
+</div>

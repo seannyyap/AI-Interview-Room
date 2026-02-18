@@ -1,0 +1,24 @@
+<div class="transcript-container">
+    <div class="transcript-header">
+        <h3>Interview Transcript</h3>
+        <button class="btn-icon">⬇️</button>
+    </div>
+
+    <div class="messages" #scrollContainer>
+        @for (msg of messages; track $index) {
+        <div class="message" [class.ai]="msg.role === 'ai'" [class.user]="msg.role === 'user'">
+            <div class="message-meta">
+                <span class="role">{{ msg.role === 'ai' ? 'HRbot' : 'You' }}</span>
+                <span class="time">{{ msg.timestamp }}</span>
+            </div>
+            <div class="content">{{ msg.text }}</div>
+        </div>
+        }
+    </div>
+
+    <div class="typing-indicator" *ngIf="isAiThinking">
+        <span class="dot"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+    </div>
+</div>

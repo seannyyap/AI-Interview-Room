@@ -1,0 +1,88 @@
+.avatar-container {
+    position: relative;
+    width: 300px;
+    height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ball {
+    width: 120px;
+    height: 120px;
+    background: radial-gradient(circle at 30% 30%, var(--primary-color), #0ea5e9);
+    border-radius: 50%;
+    position: relative;
+    z-index: 2;
+    box-shadow: 0 0 50px rgba(56, 189, 248, 0.4),
+        inset -10px -10px 20px rgba(0, 0, 0, 0.2);
+    transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.rings {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+.ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    border-radius: 50%;
+    animation: ripple 4s infinite cubic-bezier(0, 0.2, 0.8, 1);
+
+    &:nth-child(2) {
+        animation-delay: -1s;
+    }
+
+    &:nth-child(3) {
+        animation-delay: -2s;
+    }
+}
+
+.speaking .ball {
+    animation: breathe 2s infinite ease-in-out;
+    box-shadow: 0 0 80px rgba(244, 114, 182, 0.5),
+        inset -10px -10px 20px rgba(0, 0, 0, 0.2);
+    background: radial-gradient(circle at 30% 30%, var(--accent-color), #ec4899);
+}
+
+.speaking .ring {
+    border-color: rgba(244, 114, 182, 0.2);
+}
+
+@keyframes ripple {
+    0% {
+        width: 120px;
+        height: 120px;
+        opacity: 1;
+        border-width: 1px;
+    }
+
+    100% {
+        width: 300px;
+        height: 300px;
+        opacity: 0;
+        border-width: 0.5px;
+    }
+}
+
+@keyframes breathe {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.15);
+        box-shadow: 0 0 100px rgba(244, 114, 182, 0.6);
+    }
+}
