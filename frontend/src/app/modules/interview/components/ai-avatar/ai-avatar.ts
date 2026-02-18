@@ -2,8 +2,7 @@ import { Component } from '@angular/core';
 
 @Component({
   selector: 'app-ai-avatar',
-  standalone: true,
-  imports: [],
+  standalone: false,
   templateUrl: './ai-avatar.html',
   styleUrl: './ai-avatar.scss'
 })
