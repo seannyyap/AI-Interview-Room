@@ -75,22 +75,25 @@ These four pillars are woven into every phase — not bolted on at the end:
 
 > **Skill level:** Software Engineer  
 > **Time estimate:** 1–2 days  
-> **Goal:** Set up the monorepo, tooling, and dev environment with good engineering foundations
+> **Goal:** Set up the project structure, tooling, and dev environment with good engineering foundations
 
 ### What to Do
 
-1. **Initialize the monorepo structure**
+1. **Project structure** (reflects the actual repo):
    ```
    AI-Interview-Room/
-   ├── apps/
-   │   └── frontend/           # Angular app (Phase 1)
-   ├── services/
-   │   └── ai-orchestrator/    # FastAPI app (Phase 2)
-   ├── packages/
-   │   ├── shared-types/       # Shared TypeScript/Python schemas
-   │   └── prompts/            # Interview prompt templates
-   ├── infra/
-   │   └── docker/             # Dockerfiles + compose
+   ├── frontend/               # Angular app
+   │   └── src/app/
+   │       ├── modules/        # Feature modules (interview, dashboard, etc.)
+   │       ├── shared/         # Shared components, models, utils
+   │       └── ...
+   ├── backend/                # FastAPI app (Phase 2)
+   │   ├── routers/
+   │   ├── services/
+   │   ├── providers/
+   │   ├── models/
+   │   └── config.py
+   ├── prompts/                # Interview prompt templates (Phase 4)
    ├── docs/                   # Your notes and learnings
    ├── .gitignore
    ├── README.md
@@ -104,7 +107,7 @@ These four pillars are woven into every phase — not bolted on at the end:
 3. **Set up Python environment for the backend**
    - Install Python 3.11+
    - Learn `uv` for dependency management
-   - Create a virtual environment for `services/ai-orchestrator/`
+   - Create a virtual environment for `backend/`
    - Pin all dependency versions from day one (`uv.lock`)
 
 4. **Set up Node environment for the frontend**
@@ -125,7 +128,7 @@ These four pillars are woven into every phase — not bolted on at the end:
 | 🔒 Security | Add `.env.example` with placeholder secrets. Add `.env` to `.gitignore`. Never commit secrets. |
 | 🔒 Security | Set up `pre-commit` hooks: lint + secret scanning (`detect-secrets` or `gitleaks`) |
 | ⚡ Performance | N/A for this phase |
-| 📈 Scalability | Structure as a monorepo — services are independently deployable from the start |
+| 📈 Scalability | Keep frontend and backend as separate top-level directories — independently deployable from the start |
 | 🔧 Maintainability | Set up linters: ESLint (frontend), Ruff (Python). Enforce from day one. |
 | 🔧 Maintainability | Create `docs/decisions/` folder for ADRs (Architecture Decision Records) — document WHY you chose each tool |
 
@@ -135,7 +138,7 @@ These four pillars are woven into every phase — not bolted on at the end:
 
 > **Skill level:** Frontend Engineer  
 > **Time estimate:** 5–7 days  
-> **Goal:** Build the complete Angular UI with audio capture, WebSocket streaming, and a landing page
+> **Goal:** Build the interview room UI with audio capture, WebSocket streaming, and interview configuration
 
 ### What to Learn First
 
@@ -188,6 +191,7 @@ These four pillars are woven into every phase — not bolted on at the end:
 
 2. **Interview Room Page** (`/interview`)
    - Start/Stop button, live audio waveform visualizer, transcript area (empty for now)
+   - Interview configuration: choose position type, difficulty level, focus areas
    - Use Angular Material or Spartan UI components
 
 3. **Audio Capture Service** (`services/audio-capture.service.ts`)
@@ -202,16 +206,6 @@ These four pillars are woven into every phase — not bolted on at the end:
    - Receive text messages back (transcripts, AI responses)
    - Connection state as a Signal: `connectionState: Signal<ConnectionState>`
    - Handle reconnection logic with RxJS `retryWhen`
-
-5. **Audio Playback Service** (`services/audio-playback.service.ts`)
-   - Receive TTS audio chunks from the server
-   - Queue and play them using Web Audio API
-   - Handle seamless playback of streamed chunks (no gaps or clicks)
-
-6. **Dashboard Page** (`/dashboard`) — skeleton for now
-   - Interview history list (mock data)
-   - Score summaries (mock data)
-   - This gets real data in Phase 3
 
 ### Engineering Checklist — Phase 1
 
@@ -238,7 +232,7 @@ These four pillars are woven into every phase — not bolted on at the end:
 
 > **Skill level:** Backend Engineer  
 > **Time estimate:** 3–5 days  
-> **Goal:** Build a FastAPI server with pluggable AI service interfaces and session management
+> **Goal:** Build a FastAPI server with pluggable AI service interfaces, session management, and conversation tracking
 
 ### What to Learn First
 
@@ -293,18 +287,23 @@ These four pillars are woven into every phase — not bolted on at the end:
    - Each WebSocket connection = one session
    - Store session metadata: start time, state, conversation history
 
-5. **REST API Endpoints** (`routers/api.py`)
+5. **Conversation Manager** (`services/conversation.py`)
+   - Maintain conversation history per session
+   - Handle context window management (truncate old messages when too long)
+   - This is backend logic, not AI — build it now so it's ready when real models arrive
+
+6. **REST API Endpoints** (`routers/api.py`)
    - `GET /api/interviews` — list past interviews (mock data for now)
    - `GET /api/interviews/{id}` — interview detail with transcript
    - `POST /api/interviews` — start a new interview
    - `GET /api/health` — health check endpoint
 
-6. **Configuration** (`config.py`)
+7. **Configuration** (`config.py`)
    - Pydantic `BaseSettings` for all config
    - `AI_BACKEND: Literal["local", "cloud"]` — controls which provider loads
    - Model paths, API keys, feature flags — all from env vars
 
-7. **Docker Compose**
+8. **Docker Compose**
    - `ai-orchestrator` service with hot-reload (`uvicorn --reload`)
    - Expose port 8000
    - Volume mount your code for development
@@ -326,61 +325,77 @@ These four pillars are woven into every phase — not bolted on at the end:
 | 🔧 Maintainability | Write your first integration test: WebSocket client sends dummy audio → server responds. Use `pytest` + `httpx`. |
 
 ### Checkpoint
-> ✅ You should be able to: Open the Angular frontend, speak, see audio chunks arrive at the backend (logged), and receive dummy text responses displayed in the transcript area. **Full round-trip over WebSocket, no AI yet — but the service interfaces are ready for real models.**
+> ✅ You should be able to: Open the Angular frontend, speak, see audio chunks arrive at the backend (logged), and receive dummy text responses displayed in the transcript area. **Full round-trip over WebSocket, no AI yet — but the service interfaces and conversation manager are ready for real models.**
 
 ---
 
-## Phase 3 — Data Layer & Storage
+## Phase 3 — Auth & Data Layer
 
 > **Skill level:** Software Engineer (familiar)  
-> **Time estimate:** 3–5 days  
-> **Goal:** Persist interviews, transcripts, recordings, user accounts, and wire the dashboard with real data
+> **Time estimate:** 5–7 days  
+> **Goal:** Add authentication, persist interviews/transcripts/recordings, and wire the dashboard with real data
 
 ### What to Learn First
 
-1. **SQLAlchemy 2.0 with async**
+1. **JWT Authentication**
+   - Access tokens (short-lived) + refresh tokens (long-lived)
+   - How to protect REST endpoints and WebSocket connections
+   - Resource: [FastAPI Security docs](https://fastapi.tiangolo.com/tutorial/security/)
+
+2. **SQLAlchemy 2.0 with async**
    - Declarative models with `mapped_column`
    - Async session factory with `asyncpg`
    - Resource: [SQLAlchemy 2.0 tutorial](https://docs.sqlalchemy.org/en/20/tutorial/)
 
-2. **Alembic for migrations**
+3. **Alembic for migrations**
    - Auto-generate migrations from model changes
    - Never modify the database schema manually
 
-3. **Redis fundamentals**
+4. **Redis fundamentals**
    - Key-value storage, TTL, Pub/Sub
    - Why Redis for sessions: fast, ephemeral, supports TTL expiry
 
 ### What to Build
 
-1. **PostgreSQL Schema** (via SQLAlchemy models + Alembic migrations)
+1. **Authentication** (`routers/auth.py`, `services/auth.py`)
+   - JWT-based auth (access + refresh tokens)
+   - `POST /api/auth/register` — create account
+   - `POST /api/auth/login` — issue tokens
+   - `POST /api/auth/refresh` — rotate tokens
+   - Protect REST endpoints with middleware
+   - Protect WebSocket: validate token in handshake, reject unauthenticated connections
+   - Angular auth guards for protected routes
+   - *Social login (Google OAuth) comes in Phase 5*
+
+2. **PostgreSQL Schema** (via SQLAlchemy models + Alembic migrations)
    - `users` table: id, email, hashed_password, role, created_at, deleted_at
    - `interviews` table: id, user_id, position, status, config (JSON), started_at, ended_at
    - `messages` table: id, interview_id, role (user/ai), content, timestamp
    - `scores` table: id, interview_id, criteria, score, reasoning, created_at
 
-2. **Repository Layer** (`repositories/`)
+3. **Repository Layer** (`repositories/`)
    - `UserRepository` — CRUD for users
    - `InterviewRepository` — CRUD for interviews + messages
    - `ScoreRepository` — CRUD for scores
    - Repository pattern: don't scatter SQL across services
 
-3. **Redis Integration**
+4. **Redis Integration**
    - Session state (active interviews) with TTL
    - Swap in-memory session manager from Phase 2 for Redis-backed one
    - Rate limiting token bucket
 
-4. **MinIO for Object Storage**
+5. **MinIO for Object Storage**
    - Store audio recordings (full interview WAV/opus)
    - Store exported transcripts or reports
    - Pre-signed URLs for secure download
 
-5. **Wire the Dashboard**
+6. **Dashboard Page** (`/dashboard`)
    - Connect Angular dashboard page to real REST endpoints
    - Display interview history from PostgreSQL
    - Display score summaries
+   - Protected by auth guard
 
-6. **Docker Compose Update**
+7. **Docker Compose Update**
    - Add PostgreSQL, Redis, MinIO containers
    - Persistent volumes for data
 
@@ -393,6 +408,7 @@ These four pillars are woven into every phase — not bolted on at the end:
 | 🔒 Security | **Encrypt audio at rest** in MinIO (SSE-S3 encryption). Interview recordings are sensitive HR data. |
 | 🔒 Security | **Pre-signed URLs** for file downloads — time-limited (15 min), per-user. |
 | 🔒 Security | **PII handling** — candidate names, transcripts, scores are PII. Implement soft-delete (`deleted_at`). Plan for GDPR from day one. |
+| 🔒 Security | **JWT best practices** — short-lived access tokens (15 min), httpOnly refresh token, token revocation on logout. |
 | ⚡ Performance | **Index** frequently queried columns: `interviews.user_id`, `messages.interview_id`, `interviews.status`. |
 | ⚡ Performance | Use connection pooling (`asyncpg` + SQLAlchemy async) — don't open a new DB connection per request. |
 | 📈 Scalability | MinIO is S3-compatible — swap for real S3 in production with zero code changes. |
@@ -401,15 +417,15 @@ These four pillars are woven into every phase — not bolted on at the end:
 | 🔧 Maintainability | Write DB seed scripts for development/testing data. |
 
 ### Checkpoint
-> ✅ You should be able to: Complete a mock interview → see it stored in PostgreSQL → view it on the Angular dashboard → download the audio recording from MinIO. Data persists across restarts.
+> ✅ You should be able to: Register, log in, complete a mock interview → see it stored in PostgreSQL → view it on the Angular dashboard → download the audio recording from MinIO. Data persists across restarts. Unauthenticated users are blocked.
 
 ---
 
-## Phase 4 — AI Models: STT, LLM & TTS 🧠
+## Phase 4 — AI Models: STT, LLM, TTS & End-to-End Pipeline 🧠
 
 > **Skill level:** Entering AI territory  
 > **Time estimate:** 10–14 days  
-> **Goal:** Implement real AI providers (local + cloud) behind the service interfaces you built in Phase 2
+> **Goal:** Implement real AI providers (local + cloud) behind the service interfaces, wire the full voice pipeline, and add AI scoring
 
 This is the longest and most important phase. Take your time with the learning sections.
 
@@ -586,14 +602,10 @@ for threads in ["2", "4", "6", "8"]:
    - Uses OpenAI API or Anthropic API
    - Same interface, cloud backend
 
-4. **Interview Prompt System** (`packages/prompts/`)
+4. **Interview Prompt System** (`prompts/`)
    - System prompt for AI interviewer persona
    - Store prompts in versioned files, not inline strings
    - Start simple: "You are a technical interviewer for a software engineering position..."
-
-5. **Conversation Manager** (`services/conversation.py`)
-   - Maintain conversation history per session
-   - Handle context window management (truncate old messages if too long)
 
 #### LLM Experiments
 
@@ -644,6 +656,41 @@ for temp in [0.0, 0.3, 0.5, 0.7, 1.0]:
    - Stop TTS playback when user starts talking
    - Cancel pending TTS, start listening
 
+---
+
+### Part D: End-to-End Pipeline & Scoring — 2–3 days
+
+> This is where everything comes together. All the pieces from Phases 1–3 and Parts A–C above are wired into a seamless experience.
+
+#### What to Build
+
+1. **Full Voice Pipeline**
+   - User speaks → STT transcribes → transcript added to conversation → LLM generates → TTS speaks → user hears response
+   - All flowing through the service interfaces from Phase 2
+   - Stream LLM tokens to frontend AND to TTS simultaneously
+
+2. **Audio Playback Service** (Angular: `services/audio-playback.service.ts`)
+   - Receive TTS audio chunks from the server
+   - Queue and play them using Web Audio API
+   - Handle seamless playback of streamed chunks (no gaps or clicks)
+
+3. **AI Scoring Feature** (LLM-based)
+   - After interview ends, send full transcript to LLM with a scoring prompt
+   - "Rate this candidate on: communication, technical depth, problem-solving..."
+   - Store structured scores in PostgreSQL (Phase 3 schema)
+   - Display scores on the dashboard
+
+4. **Error Recovery**
+   - WebSocket disconnects mid-interview → auto-save progress, allow reconnect
+   - Model loading failure → health check reports unhealthy, don't accept sessions
+   - Graceful degradation: if local model fails, fall back to cloud
+
+5. **Frontend Polish**
+   - Real-time transcript display with proper formatting
+   - Smooth audio playback
+   - Loading states, error states, empty states
+   - Interview summary view after completion
+
 ### Engineering Checklist — Phase 4 (All Parts)
 
 | Principle | Action |
@@ -661,81 +708,33 @@ for temp in [0.0, 0.3, 0.5, 0.7, 1.0]:
 | ⚡ Performance | Set `OMP_NUM_THREADS=6` for your Ryzen 5 5600 |
 | ⚡ Performance | **Measure**: `stt_duration_ms`, `llm_time_to_first_token_ms`, `tokens_per_second`, `tts_duration_ms` |
 | ⚡ Performance | Run TTS on CPU while LLM runs on GPU — **no resource contention** |
+| ⚡ Performance | **Measure end-to-end latency**: `user_stops_speaking → AI_audio_starts_playing`. Target < 3s. |
+| ⚡ Performance | **Pre-warm all models** at startup — synthesize a test phrase, run a dummy inference |
 | 📈 Scalability | Provider pattern means you can flip to cloud APIs with one env var change |
 | 📈 Scalability | **Concurrent session limit** — your 7800 XT handles 1-2 concurrent LLM sessions. Use a semaphore. |
+| 📈 Scalability | Document your **scaling bottleneck map**: GPU (LLM) → CPU (STT) → CPU (TTS) |
 | 🔧 Maintainability | **Externalize all model config** — model paths, temperature, max_tokens from env vars |
 | 🔧 Maintainability | Write standalone test scripts for each provider |
 | 🔧 Maintainability | Log model name, compute type, and device at startup |
-
-### Checkpoint
-> ✅ You should be able to: Speak → see transcription → see AI response stream → hear the AI speak back. Full voice conversation in < 3 seconds end-to-end on your local hardware. Toggle `AI_BACKEND=cloud` and it works the same way via cloud APIs. **This is the core product experience.**
-
----
-
-## Phase 5 — Integration & Full Pipeline
-
-> **Skill level:** Full-Stack Engineer  
-> **Time estimate:** 3–5 days  
-> **Goal:** Wire everything together into a seamless end-to-end experience
-
-### What to Build
-
-1. **End-to-End Pipeline**
-   - User speaks → STT transcribes → transcript added to conversation → LLM generates → TTS speaks → user hears response
-   - All flowing through the service interfaces from Phase 2
-   - Stream LLM tokens to frontend AND to TTS simultaneously
-
-2. **AI Scoring Feature** (LLM-based)
-   - After interview ends, send full transcript to LLM with a scoring prompt
-   - "Rate this candidate on: communication, technical depth, problem-solving..."
-   - Store structured scores in PostgreSQL (Phase 3 schema)
-   - Display scores on the dashboard
-
-3. **Interview Configuration**
-   - Let users choose: position type, difficulty level, focus areas
-   - These configure the system prompt dynamically
-   - Store config in the interview record
-
-4. **Error Recovery**
-   - WebSocket disconnects mid-interview → auto-save progress, allow reconnect
-   - Model loading failure → health check reports unhealthy, don't accept sessions
-   - Graceful degradation: if local model fails, fall back to cloud
-
-5. **Polish the Frontend**
-   - Real-time transcript display with proper formatting
-   - Smooth audio playback
-   - Loading states, error states, empty states
-   - Interview summary view after completion
-
-### Engineering Checklist — Phase 5
-
-| Principle | Action |
-|---|---|
-| ⚡ Performance | **Measure end-to-end latency**: `user_stops_speaking → AI_audio_starts_playing`. Target < 3s. |
-| ⚡ Performance | **Pre-warm all models** at startup — synthesize a test phrase, run a dummy inference |
-| 📈 Scalability | Document your **scaling bottleneck map**: GPU (LLM) → CPU (STT) → CPU (TTS) |
 | 🔧 Maintainability | Write an end-to-end integration test: send audio → receive transcript + AI response |
 | 🔧 Maintainability | Add OpenTelemetry tracing: trace a request from WebSocket → STT → LLM → TTS → response |
 
 ### Checkpoint
-> ✅ Full voice conversation with AI interviewer, plus interview scoring and dashboard. This is a **demoable product**.
+> ✅ Full voice conversation with AI interviewer: Speak → see transcription → see AI response stream → hear the AI speak back. End-to-end in < 3 seconds on your local hardware. Toggle `AI_BACKEND=cloud` and it works the same way via cloud APIs. Interview scoring and dashboard display working. **This is a demoable product.**
 
 ---
 
-## Phase 6 — Auth, Billing & Production Hardening 🔒💳
+## Phase 5 — Billing, Production Hardening & Launch 🔒💳
 
 > **Skill level:** DevOps / Full-Stack  
 > **Time estimate:** 7–10 days  
-> **Goal:** Make it secure, billable, and production-ready
+> **Goal:** Make it billable, secure, observable, and production-ready
 
 ### What to Build
 
-1. **Authentication & Authorization**
-   - JWT-based auth (access + refresh tokens)
-   - Protect REST endpoints with middleware
-   - Protect WebSocket: validate token in handshake, reject unauthenticated connections
-   - Angular auth guards for protected routes
-   - Social login (Google OAuth) for frictionless signup
+1. **Social Login** (Google OAuth)
+   - Frictionless signup experience
+   - Link with existing JWT auth from Phase 3
 
 2. **Billing (Stripe Integration)**
    - Subscription plans: Free (3 interviews/month), Pro ($19/month), Premium ($49/month)
@@ -744,7 +743,7 @@ for temp in [0.0, 0.3, 0.5, 0.7, 1.0]:
    - Usage metering: count interviews per billing period
    - Angular billing/settings page
 
-3. **API Security**
+3. **API Security Hardening**
    - Rate limiting: per-user and per-IP (Redis token bucket)
    - Request size limits
    - Security headers: HSTS, X-Content-Type-Options, X-Frame-Options, CSP
@@ -769,7 +768,7 @@ for temp in [0.0, 0.3, 0.5, 0.7, 1.0]:
    - Circuit breaker: if STT fails 5x → stop accepting audio for 30s
    - Auto-save interview on disconnect
 
-### Engineering Checklist — Phase 6
+### Engineering Checklist — Phase 5
 
 | Principle | Action |
 |---|---|
@@ -788,7 +787,7 @@ for temp in [0.0, 0.3, 0.5, 0.7, 1.0]:
 
 ---
 
-## Phase 7 — Advanced AI & Growth 🚀
+## Phase 6 — Advanced AI & Growth 🚀
 
 > Once the core product works, these are the skills that separate a software engineer from an AI engineer:
 
@@ -873,11 +872,10 @@ for temp in [0.0, 0.3, 0.5, 0.7, 1.0]:
 Phase 0: Project setup                    [1-2 days]   ← You know this
 Phase 1: Frontend (Angular + Audio)       [5-7 days]   ← You know this + Angular + Web Audio
 Phase 2: Backend (FastAPI + Interfaces)   [3-5 days]   ← You know this + pluggable design
-Phase 3: Database & Storage               [3-5 days]   ← You know this
-Phase 4: AI Models (STT + LLM + TTS)     [10-14 days]  ← 🧠🧠 CORE AI SKILLS
-Phase 5: Integration & Pipeline           [3-5 days]   ← Wiring it all together
-Phase 6: Auth, Billing & Production       [7-10 days]  ← You know this + Stripe
-Phase 7: Advanced AI                      [Ongoing]    ← 🧠🧠🧠 GROWTH
+Phase 3: Auth & Data Layer                [5-7 days]   ← You know this + JWT auth
+Phase 4: AI Models + Pipeline             [10-14 days] ← 🧠🧠 CORE AI SKILLS
+Phase 5: Billing & Production             [7-10 days]  ← You know this + Stripe
+Phase 6: Advanced AI                      [Ongoing]    ← 🧠🧠🧠 GROWTH
 
 Total estimated time: 6-8 weeks (part-time)
 ```
@@ -889,7 +887,7 @@ Total estimated time: 6-8 weeks (part-time)
 1. **Don't optimize early.** Get the ugly version working first. Optimize latency after.
 2. **Log everything.** Timestamps at each stage (audio received, STT done, LLM first token, TTS first chunk). This is how you find bottlenecks.
 3. **Small models first.** Use Whisper `tiny`, Qwen2.5-3B while developing. Switch to larger models only when testing quality.
-4. **Security is not Phase 6.** The checklists above embed security into every phase. Don't bolt it on at the end.
+4. **Security is not Phase 5.** The checklists above embed security into every phase. Don't bolt it on at the end.
 5. **Your AMD GPU is an advantage.** 16GB VRAM > 8GB NVIDIA in practice. Vulkan support in llama.cpp is mature.
 6. **Build the interfaces first, models second.** The pluggable provider pattern from Phase 2 is your most important architectural decision.
 7. **Read the source code.** When faster-whisper or llama-cpp-python does something unexpected, read their source. This builds deep understanding.

@@ -1,21 +1,41 @@
-.interview-spatial-layout {
+/* =========================================================================
+   INTERVIEW PAGE - RESPONSIVE LAYERED GRID
+   ========================================================================= */
+
+.interview-grid-layout {
     width: 100%;
+    /* Fill remaining height below header */
     height: calc(100vh - var(--header-height));
-    position: relative;
+    display: grid;
+    /* Create a single massive cell */
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
     overflow: hidden;
-    /* Clean gradient background in body */
 }
 
-/* --- CENTER STAGE --- */
-.orb-stage {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+/* --- MAIN STAGE (Center Area) --- */
+.main-stage {
+    /* Stack into the single grid cell */
+    grid-area: 1 / 1;
     z-index: 10;
+
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    /* Guarantee dead-center alignment */
+}
+
+.orb-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    /* Takes up all space above the console */
 }
 
 .orb-reflection {
@@ -25,16 +45,153 @@
     border-radius: 50%;
     margin-top: -40px;
     filter: blur(20px);
-    z-index: -1;
     transform: scaleY(0.5);
     opacity: 0.6;
 }
 
-/* --- BOTTOM CONSOLE --- */
 .console-wrapper {
-    position: absolute;
-    bottom: 40px;
+    width: 100%;
+    max-width: 600px;
+    margin-top: auto;
+    /* Pushes console to the bottom of the main stage */
+    padding-bottom: var(--spacing-lg);
+    /* Give it breathing room off the bottom edge */
+    z-index: 100;
+
+    /* Center the pill component horizontally */
+    display: flex;
+    justify-content: center;
+}
+
+
+/* --- RIGHT SIDEBAR (Transcript & Webcam HUD) --- */
+.side-panel {
+    /* Stack into the exact same grid cell, but float to the right */
+    grid-area: 1 / 1;
+    z-index: 20;
+    justify-self: end;
+    /* Pin to the right side of the screen */
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    height: 100%;
+    width: min(500px, 40vw);
+    /* Take up 500px, or 40% of small screens, whichever is smaller */
+    padding: var(--spacing-md) var(--spacing-lg) var(--spacing-md) 0;
+    box-sizing: border-box;
+    pointer-events: none;
+    /* Let clicks pass through empty space to the orb stage */
+}
+
+/* Re-enable clicks strictly on the panels themselves */
+.transcript-wrapper,
+.webcam-wrapper {
+    pointer-events: auto;
+}
+
+.transcript-wrapper {
+    flex: 1;
+    /* Transcript takes all available vertical space */
+    min-height: 200px;
+    /* Prevent complete squishing */
+    max-height: 60vh;
+    /* Constrain the height so it doesn't overrun the screen visually */
+}
+
+.webcam-wrapper {
+    /* Fixed aspect ratio box for the webcam at the bottom of the sidebar */
+    height: clamp(180px, 30vh, 280px);
+    flex-shrink: 0;
+    /* Keep the webcam height static, don't squish it */
+}
+
+
+/* --- RESPONSIVE STACKING (< 1024px or zoomed in) --- */
+
+@media (max-width: 1024px) {
+    .interview-grid-layout {
+        /* Break the stacked layout and go sequential */
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        /* Enable vertical scrolling */
+        height: auto;
+        min-height: calc(100vh - var(--header-height));
+        padding-bottom: var(--spacing-lg);
+    }
+
+    .main-stage {
+        height: 60vh;
+        min-height: 450px;
+        flex-shrink: 0;
+    }
+
+    .side-panel {
+        /* Stop floating right, span full width below the stage */
+        width: 100%;
+        padding: 0 var(--spacing-lg);
+        height: auto;
+    }
+
+    .transcript-wrapper {
+        min-height: 500px;
+        /* Give transcript a fixed height when scrolling */
+    }
+}
+
+
+/* --- ERROR TOAST --- */
+.error-toast {
+    position: fixed;
+    /* Fixed to window, not grid */
+    top: -100px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 100;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-radius: 12px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 10px 30px rgba(239, 68, 68, 0.15);
+    min-width: 300px;
+    transition: top 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    &.visible {
+        top: 90px;
+        /* Below the header */
+    }
+
+    .error-content {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+
+        .error-message {
+            color: #ef4444;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+    }
+
+    .dismiss-btn {
+        background: none;
+        border: none;
+        color: #ef4444;
+        font-size: 1.5rem;
+        padding: 0;
+        line-height: 1;
+        cursor: pointer;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+
+        &:hover {
+            opacity: 1;
+        }
+    }
 }

@@ -8,6 +8,8 @@ import { AiOrbComponent } from './components/ai-avatar/ai-avatar';
 import { WebcamComponent } from './components/webcam/webcam';
 import { TranscriptComponent } from './components/transcript/transcript';
 import { InterviewConsoleComponent } from './components/interview-console/interview-console';
+import { DeviceSettingsComponent } from './components/device-settings/device-settings';
+
 
 import { SharedModule } from '../../shared/shared.module';
 
@@ -17,8 +19,10 @@ import { SharedModule } from '../../shared/shared.module';
         AiOrbComponent,
         WebcamComponent,
         TranscriptComponent,
-        InterviewConsoleComponent
+        InterviewConsoleComponent,
+        DeviceSettingsComponent
     ],
+
     imports: [
         CommonModule,
         RouterModule.forChild(INTERVIEW_ROUTES),

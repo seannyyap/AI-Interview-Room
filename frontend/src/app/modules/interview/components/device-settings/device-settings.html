@@ -1,0 +1,75 @@
+<div class="settings-modal glass">
+    <div class="settings-header">
+        <h3>Settings</h3>
+        <button class="close-btn" (click)="close.emit()">&times;</button>
+    </div>
+
+    <div class="settings-content">
+        <!-- Microphone Section -->
+        <div class="setting-group">
+            <label>
+                <img src="/assets/icons/mic-on.svg" class="label-icon" alt="Mic">
+                Microphone
+            </label>
+            <select [value]="deviceManager.selectedMicId()" (change)="onMicChange($event)" class="glass-select">
+                <option value="default">System Default</option>
+                <option *ngFor="let mic of deviceManager.microphones$()" [value]="mic.deviceId">
+                    {{ mic.label || 'Microphone ' + mic.deviceId.slice(0, 5) }}
+                </option>
+            </select>
+
+            <div class="test-area">
+                <button class="test-btn" (click)="testMic()" [disabled]="isTestingMic()">
+                    {{ isTestingMic() ? 'Testing...' : 'Test Mic' }}
+                </button>
+                <div class="meter-container">
+                    <div class="meter-bar" [style.width.%]="micLevel()"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Speaker Section -->
+        <div class="setting-group">
+            <label>
+                <img src="/assets/icons/mic-off.svg" class="label-icon" style="filter: hue-rotate(90deg);"
+                    alt="Speaker">
+                Speaker
+            </label>
+            <select [value]="deviceManager.selectedSpeakerId()" (change)="onSpeakerChange($event)" class="glass-select">
+                <option value="default">System Default</option>
+                <option *ngFor="let spk of deviceManager.speakers$()" [value]="spk.deviceId">
+                    {{ spk.label || 'Speaker ' + spk.deviceId.slice(0, 5) }}
+                </option>
+            </select>
+
+            <div class="test-area">
+                <button class="test-btn" (click)="testSpeaker()" [disabled]="deviceManager.isTestingSpeaker()">
+                    {{ deviceManager.isTestingSpeaker() ? 'Playing...' : 'Test Speaker' }}
+                </button>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Camera Section -->
+        <div class="setting-group">
+            <label>
+                <img src="/assets/icons/cam-on.svg" class="label-icon" alt="Camera">
+                Camera
+            </label>
+            <select [value]="deviceManager.selectedCamId()" (change)="onCamChange($event)" class="glass-select">
+                <option value="default">System Default</option>
+                <option *ngFor="let cam of deviceManager.cameras$()" [value]="cam.deviceId">
+                    {{ cam.label || 'Camera ' + cam.deviceId.slice(0, 5) }}
+                </option>
+            </select>
+
+            <div class="camera-preview">
+                <video #previewVideo autoplay playsinline [muted]="true"></video>
+                <div class="placeholder" *ngIf="!isPreviewActive">Loading preview...</div>
+            </div>
+        </div>
+    </div>
+</div>

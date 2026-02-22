@@ -1,20 +1,33 @@
 <div class="console-pill">
     <div class="status-indicator">
         <div class="dot" [class]="store.status()"></div>
-        <span class="status-label">{{ store.status() }}</span>
+        <span class="status-label">{{ store.statusLabel() }}</span>
     </div>
 
     <div class="divider"></div>
 
     <div class="controls">
-        <button class="control-btn" [class.active]="store.isMicrophoneActive()"
-            (click)="store.toggleMicrophone(!store.isMicrophoneActive())" title="Toggle Microphone">
+        <button class="control-btn" [class.active]="store.isMicrophoneActive()" (click)="toggleMic()"
+            title="Toggle Microphone" aria-label="Toggle Microphone" [attr.aria-pressed]="store.isMicrophoneActive()">
             <img [src]="!store.isMicrophoneActive() ? '/assets/icons/mic-off.svg' : '/assets/icons/mic-on.svg'"
-                class="icon-svg" alt="Mic">
+                class="icon-svg" alt="">
         </button>
 
-        <button class="control-btn end-call" (click)="store.reset()" title="End Interview">
-            <img src="/assets/icons/end-call.svg" class="icon-svg" alt="End">
+        <button class="control-btn" [class.active]="store.isCameraActive()" (click)="toggleCam()" title="Toggle Camera"
+            aria-label="Toggle Camera" [attr.aria-pressed]="store.isCameraActive()">
+            <img [src]="!store.isCameraActive() ? '/assets/icons/cam-off.svg' : '/assets/icons/cam-on.svg'"
+                class="icon-svg" alt="">
+        </button>
+
+        <button class="control-btn" [class.active]="showSettings()" (click)="toggleSettings()" title="Audio Settings"
+            aria-label="Audio and Video Settings" [attr.aria-expanded]="showSettings()" aria-haspopup="dialog">
+            <img src="/assets/icons/settings.svg" class="icon-svg" alt="">
+        </button>
+
+        <button class="control-btn end-call" (click)="endInterview()" title="End Interview" aria-label="End Interview">
+            <img src="/assets/icons/end-call.svg" class="icon-svg" alt="">
         </button>
     </div>
 </div>
+
+<app-device-settings *ngIf="showSettings()" (close)="showSettings.set(false)"></app-device-settings>

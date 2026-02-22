@@ -10,7 +10,10 @@ const routes: Routes = [
         path: 'interview',
         loadChildren: () => import('./modules/interview/interview.module').then(m => m.InterviewModule)
     },
-    { path: '', redirectTo: 'interview', pathMatch: 'full' }
+    {
+        path: '',
+        loadChildren: () => import('./modules/landing/landing.module').then(m => m.LandingModule)
+    },
 ];
 
 @NgModule({

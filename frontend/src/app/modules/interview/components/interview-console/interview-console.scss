@@ -1,6 +1,7 @@
 :host {
     display: block;
     width: fit-content;
+    position: relative;
 }
 
 .console-pill {
@@ -9,6 +10,8 @@
     gap: var(--spacing-lg);
     padding: 12px 32px;
     border-radius: 100px;
+    position: relative;
+    /* Anchor for absolute children like the settings popup */
     /* Pill shape */
     background: rgba(255, 255, 255, 0.4);
     backdrop-filter: blur(20px);
@@ -187,5 +190,30 @@
     100% {
         transform: scale(1);
         opacity: 1;
+    }
+}
+
+/* Responsive Overrides */
+@media (max-width: 600px) {
+    .console-pill {
+        padding: 12px 16px;
+        gap: var(--spacing-md);
+        justify-content: space-between;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .status-indicator .status-text {
+        display: none;
+        /* Hide label on mobile to save space */
+    }
+
+    .controls {
+        gap: 8px;
+    }
+
+    .control-btn {
+        width: 40px;
+        height: 40px;
     }
 }

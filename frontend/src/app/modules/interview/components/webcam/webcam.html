@@ -1,13 +1,8 @@
-<div class="webcam-container">
+<div class="video-container">
     <video #videoElement autoplay playsinline [muted]="true" class="video-feed"
         [hidden]="!store.isCameraActive()"></video>
 
     <div class="user-placeholder" *ngIf="!store.isCameraActive()">
         <img src="/assets/icons/user-placeholder.svg" alt="User" class="placeholder-svg">
-    </div>
-
-    <div class="recording-indicator" *ngIf="store.isCameraActive()">
-        <div class="pulse-dot"></div>
-        LIVE
     </div>
 </div>

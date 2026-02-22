@@ -1,24 +1,37 @@
-<div class="interview-spatial-layout">
+<div class="interview-grid-layout">
 
-    <!-- CENTER: AI Core -->
-    <div class="orb-stage">
-        <app-ai-orb></app-ai-orb>
-        <div class="orb-reflection"></div>
+    <!-- MAIN CENTER STAGE (Orb & Console) -->
+    <div class="main-stage">
+        <div class="orb-container">
+            <app-ai-orb></app-ai-orb>
+            <div class="orb-reflection"></div>
+        </div>
+
+        <div class="console-wrapper">
+            <app-interview-console></app-interview-console>
+        </div>
     </div>
 
-    <!-- BOTTOM: Control Deck -->
-    <div class="console-wrapper">
-        <app-interview-console></app-interview-console>
+    <!-- RIGHT SIDEBAR (Transcript & Webcam) -->
+    <div class="side-panel">
+
+        <app-floating-glass-panel class="transcript-wrapper" width="100%" height="100%">
+            <app-transcript></app-transcript>
+        </app-floating-glass-panel>
+
+        <app-floating-glass-panel class="webcam-wrapper" width="100%" height="100%">
+            <app-webcam></app-webcam>
+        </app-floating-glass-panel>
+
     </div>
 
-    <!-- TOP RIGHT: Floating Transcript (Retractable) -->
-    <app-floating-glass-panel width="500px" height="auto" positionClass="top-right">
-        <app-transcript></app-transcript>
-    </app-floating-glass-panel>
-
-    <!-- BOTTOM RIGHT: Floating Webcam -->
-    <app-floating-glass-panel width="320px" height="210px" positionClass="bottom-right">
-        <app-webcam></app-webcam>
-    </app-floating-glass-panel>
+    <!-- ERROR TOAST -->
+    <div class="error-toast glass" [class.visible]="!!store.error()" aria-live="assertive">
+        <div class="error-content">
+            <span class="error-icon">⚠️</span>
+            <span class="error-message">{{ store.error() }}</span>
+        </div>
+        <button class="dismiss-btn" (click)="store.setError(null)" aria-label="Dismiss Error">&times;</button>
+    </div>
 
 </div>

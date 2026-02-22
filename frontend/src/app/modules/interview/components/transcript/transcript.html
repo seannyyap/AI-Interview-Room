@@ -3,8 +3,8 @@
         <h3>Interview Transcript</h3>
     </div>
 
-    <div class="messages" #scrollContainer>
-        @for (msg of store.transcript(); track $index) {
+    <div class="messages" #scrollContainer (scroll)="onScroll($event)">
+        @for (msg of dummyData; track $index) {
         <div class="message" [class.ai]="msg.role === Role.AI" [class.user]="msg.role === Role.USER">
             <div class="message-meta">
                 <span class="role">{{ msg.role === Role.AI ? 'HRbot' : 'You' }}</span>
@@ -19,5 +19,12 @@
         <span class="dot"></span>
         <span class="dot"></span>
         <span class="dot"></span>
+    </div>
+
+    <!-- Scroll & Hide Indicator -->
+    <div class="scroll-more-indicator" [class.visible]="showScrollIndicator">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
     </div>
 </div>

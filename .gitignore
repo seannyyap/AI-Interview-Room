@@ -1,0 +1,47 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# === Node ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === Angular ===
+frontend/dist/
+frontend/.angular/
+
+# === Environment & Secrets ===
+.env
+.env.local
+.env.*.local
+
+# === Models (large files) ===
+models/
+
+# === IDE ===
+.idea/
+*.swp
+*.swo
+*~
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === Docker ===
+docker-data/
+
+# === Logs ===
+*.log
+logs/
