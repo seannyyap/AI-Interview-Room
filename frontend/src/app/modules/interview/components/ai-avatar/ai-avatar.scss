@@ -22,7 +22,7 @@
         inset 10px 10px 20px rgba(255, 255, 255, 1),
         0 0 40px var(--ai-glow);
 
-    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background 0.5s ease, box-shadow 0.5s ease, filter 0.5s ease;
 
     /* Idle State: Slow Breathing */
     animation: breathe 5s ease-in-out infinite;
@@ -31,7 +31,7 @@
         /* Listening: Blue Tint + Ripples */
         background: radial-gradient(circle at 30% 30%, #fff 0%, #e0f2fe 30%, var(--ai-blue) 100%);
         box-shadow: 0 0 60px var(--ai-glow);
-        transform: scale(1.05);
+        /* The scale is now handled by [style.transform] in the HTML */
 
         .rings-field .ring {
             opacity: 0.5;

@@ -28,6 +28,7 @@ export class DeviceManagerService {
     readonly selectedCamId = signal<string>(localStorage.getItem(this.CAM_KEY) || 'default');
 
     readonly isTestingSpeaker = signal<boolean>(false);
+    readonly micLevel = signal<number>(0); // Real-time volume for AI Orb (0.0 to 1.0)
 
     constructor() {
         this.refreshDevices();

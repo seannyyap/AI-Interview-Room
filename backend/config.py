@@ -30,11 +30,9 @@ class Settings(BaseSettings):
     llm_gpu_layers: int = -1
     llm_context_size: int = 4096
 
-    # Security
-    jwt_secret_key: str = "changeme-use-a-real-secret"
-    jwt_algorithm: str = "HS256"
-    jwt_access_token_expire_minutes: int = 15
+    # Other settings
     cors_origins: str = "http://localhost:4200"
+    ai_backend: str = "local"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

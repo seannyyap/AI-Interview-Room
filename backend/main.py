@@ -3,10 +3,13 @@ AI Interview Room — FastAPI Backend
 Main entry point for the FastAPI application.
 """
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.routers import api, ws
+from backend.database import engine
+from backend.models.db_models import Base
 
 # Configure logging
 logging.basicConfig(
@@ -15,10 +18,30 @@ logging.basicConfig(
 )
 logger = logging.getLogger("backend")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan — create DB tables on startup, cleanup on shutdown."""
+    logger.info(f"Starting AI Interview Room Backend")
+    logger.info(f"AI Backend Mode: {settings.ai_backend}")
+
+    # Create all tables (dev convenience — use Alembic migrations in production)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Database tables ensured")
+
+    yield
+
+    # Cleanup
+    await engine.dispose()
+    logger.info("Database engine disposed")
+
+
 app = FastAPI(
     title="AI Interview Room",
-    version="0.1.0",
+    version="0.2.0",
     description="AI-powered mock interview platform",
+    lifespan=lifespan,
 )
 
 # CORS — configured from environment
@@ -34,13 +57,6 @@ app.add_middleware(
 # Mount routers
 app.include_router(api.router, prefix="/api", tags=["API"])
 app.include_router(ws.router, tags=["WebSocket"])
-
-
-@app.on_event("startup")
-async def startup_event():
-    logger.info(f"Starting AI Interview Room Backend")
-    logger.info(f"AI Backend Mode: {settings.ai_backend}")
-    logger.info(f"CORS Origins: {origins}")
 
 
 @app.get("/")

@@ -6,8 +6,8 @@ import { Injectable } from '@angular/core';
 export class InterviewService {
     constructor() { }
 
-    // Placeholder for interview logic
+    /** Start a new interview is handled via WebSocket, but we can have a helper here */
     startInterview() {
-        console.log('Interview started');
+        console.log('Interview logic initiated');
     }
 }

@@ -1,14 +1,22 @@
-<header class="app-header glass">
+<header class="main-header glass">
     <div class="header-content">
-        <!-- Brand -->
-        <a routerLink="/" class="brand-logo">
-            <img src="/assets/icons/brand-logo.svg" alt="Logo" class="logo-svg">
-            <span class="brand-text">AI Interview Room</span>
-        </a>
+        <div class="logo-group" routerLink="/">
+            <div class="logo-icon ripple">
+                <i class="fas fa-brain"></i>
+            </div>
+            <span class="logo-text">AI Interview Room</span>
+        </div>
 
-        <!-- Spacer -->
-        <div class="spacer"></div>
+        <div class="nav-links">
+            <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Home</a>
+            <a routerLink="/interview" routerLinkActive="active">Practice</a>
+        </div>
 
-        <!-- Right Side: Interaction status or indicators can go here -->
+        <div class="header-actions">
+            <button class="join-btn" routerLink="/interview">
+                <span>Start Practice</span>
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
     </div>
 </header>

@@ -70,6 +70,17 @@ export class AudioCaptureService implements OnDestroy {
             this.workletNode.port.onmessage = (event: MessageEvent) => {
                 if (event.data?.type === 'audio-chunk') {
                     const chunk = new Float32Array(event.data.data);
+
+                    // Phase 4: Calculate real-time volume (RMS) for the AI Orb
+                    let sumSquares = 0;
+                    for (let i = 0; i < chunk.length; i++) {
+                        sumSquares += chunk[i] * chunk[i];
+                    }
+                    const rms = Math.sqrt(sumSquares / chunk.length);
+                    // Map RMS to 0.0 - 1.0 range (RMS usually peaks around 0.5-0.7 for loud speech)
+                    const normalizedVolume = Math.min(1, rms * 10);
+                    this.deviceManager.micLevel.set(normalizedVolume);
+
                     this.audioChunksSubject.next(chunk);
                 }
             };

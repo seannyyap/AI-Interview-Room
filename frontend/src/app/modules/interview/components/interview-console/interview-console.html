@@ -8,13 +8,15 @@
 
     <div class="controls">
         <button class="control-btn" [class.active]="store.isMicrophoneActive()" (click)="toggleMic()"
-            title="Toggle Microphone" aria-label="Toggle Microphone" [attr.aria-pressed]="store.isMicrophoneActive()">
+            [disabled]="isTogglingMic()" title="Toggle Microphone" aria-label="Toggle Microphone"
+            [attr.aria-pressed]="store.isMicrophoneActive()">
             <img [src]="!store.isMicrophoneActive() ? '/assets/icons/mic-off.svg' : '/assets/icons/mic-on.svg'"
                 class="icon-svg" alt="">
         </button>
 
-        <button class="control-btn" [class.active]="store.isCameraActive()" (click)="toggleCam()" title="Toggle Camera"
-            aria-label="Toggle Camera" [attr.aria-pressed]="store.isCameraActive()">
+        <button class="control-btn" [class.active]="store.isCameraActive()" (click)="toggleCam()"
+            [disabled]="isTogglingCam()" title="Toggle Camera" aria-label="Toggle Camera"
+            [attr.aria-pressed]="store.isCameraActive()">
             <img [src]="!store.isCameraActive() ? '/assets/icons/cam-off.svg' : '/assets/icons/cam-on.svg'"
                 class="icon-svg" alt="">
         </button>

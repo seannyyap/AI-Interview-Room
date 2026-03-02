@@ -1,5 +1,6 @@
 <div class="orb-container">
-    <div class="orb-core" [class.speaking]="isSpeaking()" [class.listening]="isListening()">
+    <div class="orb-core" [class.speaking]="isSpeaking()" [class.listening]="isListening()"
+        [style.transform]="'scale(' + orbScale() + ')'">
 
         <div class="inner-light"></div>
         <div class="outer-glow"></div>

@@ -45,3 +45,6 @@ docker-data/
 # === Logs ===
 *.log
 logs/
+
+# SQLite development database
+*.db

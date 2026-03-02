@@ -1,38 +1,63 @@
+import json
 from datetime import datetime
-from uuid import uuid4
 from typing import Dict, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from redis.asyncio import Redis
+from backend.config import settings
 
 
 class SessionMetadata(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid4()))
-    started_at: datetime = Field(default_factory=datetime.now)
+    id: str
+    user_id: str
+    started_at: datetime
     status: str = "active"
     client_ip: str
     interview_config: Optional[Dict] = None
 
 
 class SessionManager:
-    """Tracks active interview sessions in-memory."""
+    """Tracks active interview sessions in Redis."""
     def __init__(self):
-        self._sessions: Dict[str, SessionMetadata] = {}
+        self._redis = Redis(
+            host=settings.redis_host, 
+            port=settings.redis_port, 
+            decode_responses=True
+        )
 
-    def create_session(self, client_ip: str) -> SessionMetadata:
-        session = SessionMetadata(client_ip=client_ip)
-        self._sessions[session.id] = session
+    async def create_session(self, session_id: str, user_id: str, client_ip: str) -> SessionMetadata:
+        """Create a session record in Redis with a 1-hour TTL."""
+        session = SessionMetadata(
+            id=session_id,
+            user_id=user_id,
+            started_at=datetime.now(),
+            client_ip=client_ip
+        )
+        
+        await self._redis.setex(
+            f"session:{session_id}",
+            3600,  # 1 hour expiry
+            session.model_dump_json()
+        )
         return session
 
-    def get_session(self, session_id: str) -> Optional[SessionMetadata]:
-        return self._sessions.get(session_id)
+    async def get_session(self, session_id: str) -> Optional[SessionMetadata]:
+        data = await self._redis.get(f"session:{session_id}")
+        if data:
+            return SessionMetadata.model_validate_json(data)
+        return None
 
-    def update_config(self, session_id: str, config: Dict):
-        if session_id in self._sessions:
-            self._sessions[session_id].interview_config = config
+    async def update_config(self, session_id: str, config: Dict):
+        session = await self.get_session(session_id)
+        if session:
+            session.interview_config = config
+            await self._redis.setex(
+                f"session:{session_id}",
+                3600,
+                session.model_dump_json()
+            )
 
-    def remove_session(self, session_id: str):
-        if session_id in self._sessions:
-            del self._sessions[session_id]
+    async def remove_session(self, session_id: str):
+        await self._redis.delete(f"session:{session_id}")
 
-    @property
-    def active_count(self) -> int:
-        return len(self._sessions)
+    async def close(self):
+        await self._redis.close()

@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, inject, OnDestroy, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { InterviewStore } from '../../interview.store';
 import { InterviewStatus, Role } from '../../../../shared/models/interview.model';
@@ -17,21 +18,31 @@ export class InterviewConsoleComponent implements OnDestroy {
   readonly store = inject(InterviewStore);
   readonly InterviewStatus = InterviewStatus;
   showSettings = signal<boolean>(false);
+  isTogglingMic = signal<boolean>(false);
+  isTogglingCam = signal<boolean>(false);
 
   private audioCapture = inject(AudioCaptureService);
   private wsService = inject(WebSocketService);
   private audioSub: Subscription | null = null;
   private transcriptSub: Subscription | null = null;
   private aiResponseSub: Subscription | null = null;
+  private errorSub: Subscription | null = null; // Phase 4: WS error sub
 
   /**
    * Toggle microphone: start/stop audio capture and WebSocket streaming.
    */
   async toggleMic(): Promise<void> {
-    if (this.store.isMicrophoneActive()) {
-      this.stopCapture();
-    } else {
-      await this.startCapture();
+    if (this.isTogglingMic()) return;
+    this.isTogglingMic.set(true);
+
+    try {
+      if (this.store.isMicrophoneActive()) {
+        this.stopCapture();
+      } else {
+        await this.startCapture();
+      }
+    } finally {
+      this.isTogglingMic.set(false);
     }
   }
 
@@ -45,18 +56,37 @@ export class InterviewConsoleComponent implements OnDestroy {
   /**
    * Toggle camera: start/stop video capture via store signal.
    */
-  toggleCam(): void {
-    this.store.toggleCamera(!this.store.isCameraActive());
+  async toggleCam(): Promise<void> {
+    if (this.isTogglingCam()) return;
+    this.isTogglingCam.set(true);
+
+    try {
+      this.store.toggleCamera(!this.store.isCameraActive());
+      // Small artificial delay to prevent button hammering
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } finally {
+      this.isTogglingCam.set(false);
+    }
   }
+
+  private router = inject(Router);
 
   /**
    * End the current interview session.
    */
   endInterview(): void {
+    // Send end signal to server if connected
+    if (this.wsService.isConnected()) {
+      this.wsService.sendMessage({ type: 'interview-end' });
+    }
+
     this.stopCapture();
     this.store.toggleCamera(false);
     this.wsService.disconnect();
     this.store.reset();
+
+    // Navigate back to landing page
+    this.router.navigate(['/']);
   }
 
   private async startCapture(): Promise<void> {
@@ -98,6 +128,11 @@ export class InterviewConsoleComponent implements OnDestroy {
           });
         }
       });
+
+      // Phase 4: Pipe WS errors to store
+      this.errorSub = this.wsService.error$.subscribe((msg) => {
+        this.store.setError(msg.message);
+      });
     } catch (err) {
       console.error('[Console] Failed to start capture:', err);
       this.store.setError('Failed to access microphone');
@@ -112,6 +147,8 @@ export class InterviewConsoleComponent implements OnDestroy {
     this.transcriptSub = null;
     this.aiResponseSub?.unsubscribe();
     this.aiResponseSub = null;
+    this.errorSub?.unsubscribe();
+    this.errorSub = null;
 
     this.audioCapture.stop();
     this.store.toggleMicrophone(false);

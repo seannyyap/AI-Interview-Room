@@ -4,7 +4,7 @@
     </div>
 
     <div class="messages" #scrollContainer (scroll)="onScroll($event)">
-        @for (msg of dummyData; track $index) {
+        @for (msg of store.transcript(); track $index) {
         <div class="message" [class.ai]="msg.role === Role.AI" [class.user]="msg.role === Role.USER">
             <div class="message-meta">
                 <span class="role">{{ msg.role === Role.AI ? 'HRbot' : 'You' }}</span>
@@ -13,6 +13,10 @@
             <div class="content">{{ msg.text }}</div>
         </div>
         }
+
+        <div class="empty-state" *ngIf="store.transcript().length === 0">
+            <p>Your conversation transcript will appear here.</p>
+        </div>
     </div>
 
     <div class="typing-indicator" *ngIf="store.status() === InterviewStatus.PROCESSING">

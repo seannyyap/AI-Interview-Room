@@ -329,95 +329,43 @@ These four pillars are woven into every phase — not bolted on at the end:
 
 ---
 
-## Phase 3 — Auth & Data Layer
+## Phase 3 — Data Layer & Persistence (Auth Skipped)
 
 > **Skill level:** Software Engineer (familiar)  
-> **Time estimate:** 5–7 days  
-> **Goal:** Add authentication, persist interviews/transcripts/recordings, and wire the dashboard with real data
+> **Time estimate:** 3–5 days  
+> **Goal:** Persist interviews, transcripts, and recordings using PostgreSQL and Redis. (Authentication was removed per user request for a frictionless guest experience).
 
-### What to Learn First
+### What We Built
 
-1. **JWT Authentication**
-   - Access tokens (short-lived) + refresh tokens (long-lived)
-   - How to protect REST endpoints and WebSocket connections
-   - Resource: [FastAPI Security docs](https://fastapi.tiangolo.com/tutorial/security/)
-
-2. **SQLAlchemy 2.0 with async**
-   - Declarative models with `mapped_column`
-   - Async session factory with `asyncpg`
-   - Resource: [SQLAlchemy 2.0 tutorial](https://docs.sqlalchemy.org/en/20/tutorial/)
-
-3. **Alembic for migrations**
-   - Auto-generate migrations from model changes
-   - Never modify the database schema manually
-
-4. **Redis fundamentals**
-   - Key-value storage, TTL, Pub/Sub
-   - Why Redis for sessions: fast, ephemeral, supports TTL expiry
-
-### What to Build
-
-1. **Authentication** (`routers/auth.py`, `services/auth.py`)
-   - JWT-based auth (access + refresh tokens)
-   - `POST /api/auth/register` — create account
-   - `POST /api/auth/login` — issue tokens
-   - `POST /api/auth/refresh` — rotate tokens
-   - Protect REST endpoints with middleware
-   - Protect WebSocket: validate token in handshake, reject unauthenticated connections
-   - Angular auth guards for protected routes
-   - *Social login (Google OAuth) comes in Phase 5*
-
-2. **PostgreSQL Schema** (via SQLAlchemy models + Alembic migrations)
-   - `users` table: id, email, hashed_password, role, created_at, deleted_at
-   - `interviews` table: id, user_id, position, status, config (JSON), started_at, ended_at
+1. **PostgreSQL Schema** (via SQLAlchemy models + Alembic migrations)
+   - `interviews` table: id, user_id (anonymous), position, status, config (JSON), started_at, ended_at
    - `messages` table: id, interview_id, role (user/ai), content, timestamp
    - `scores` table: id, interview_id, criteria, score, reasoning, created_at
 
-3. **Repository Layer** (`repositories/`)
-   - `UserRepository` — CRUD for users
+2. **Repository Layer** (`repositories/`)
    - `InterviewRepository` — CRUD for interviews + messages
    - `ScoreRepository` — CRUD for scores
-   - Repository pattern: don't scatter SQL across services
 
-4. **Redis Integration**
-   - Session state (active interviews) with TTL
-   - Swap in-memory session manager from Phase 2 for Redis-backed one
-   - Rate limiting token bucket
+3. **Redis Integration**
+   - Session state (active interviews) with TTL tracking
+   - High-performance session management via `SessionManager`
 
-5. **MinIO for Object Storage**
-   - Store audio recordings (full interview WAV/opus)
-   - Store exported transcripts or reports
-   - Pre-signed URLs for secure download
-
-6. **Dashboard Page** (`/dashboard`)
-   - Connect Angular dashboard page to real REST endpoints
-   - Display interview history from PostgreSQL
-   - Display score summaries
-   - Protected by auth guard
-
-7. **Docker Compose Update**
-   - Add PostgreSQL, Redis, MinIO containers
-   - Persistent volumes for data
+4. **Persistence Flow**
+   - Every WebSocket session captures transcripts and AI responses into PostgreSQL in real-time.
 
 ### Engineering Checklist — Phase 3
 
 | Principle | Action |
 |---|---|
-| 🔒 Security | **Hash passwords** with `bcrypt` or `argon2` — never store plaintext. |
 | 🔒 Security | **Parameterized queries only** — use SQLAlchemy ORM. Never string-format SQL. |
-| 🔒 Security | **Encrypt audio at rest** in MinIO (SSE-S3 encryption). Interview recordings are sensitive HR data. |
-| 🔒 Security | **Pre-signed URLs** for file downloads — time-limited (15 min), per-user. |
-| 🔒 Security | **PII handling** — candidate names, transcripts, scores are PII. Implement soft-delete (`deleted_at`). Plan for GDPR from day one. |
-| 🔒 Security | **JWT best practices** — short-lived access tokens (15 min), httpOnly refresh token, token revocation on logout. |
+| 🔒 Security | Implement soft-delete (`deleted_at`) for future data privacy compliance. |
 | ⚡ Performance | **Index** frequently queried columns: `interviews.user_id`, `messages.interview_id`, `interviews.status`. |
-| ⚡ Performance | Use connection pooling (`asyncpg` + SQLAlchemy async) — don't open a new DB connection per request. |
-| 📈 Scalability | MinIO is S3-compatible — swap for real S3 in production with zero code changes. |
-| 📈 Scalability | Repository pattern makes it easy to add caching or read replicas later. |
+| ⚡ Performance | Use connection pooling (`asyncpg` + SQLAlchemy async) — avoids expensive handshake per request. |
+| 📈 Scalability | Redis-backed sessions allow horizontal scaling of the WebSocket server. |
 | 🔧 Maintainability | **Alembic migrations** — every schema change is versioned and reversible. |
-| 🔧 Maintainability | Write DB seed scripts for development/testing data. |
 
 ### Checkpoint
-> ✅ You should be able to: Register, log in, complete a mock interview → see it stored in PostgreSQL → view it on the Angular dashboard → download the audio recording from MinIO. Data persists across restarts. Unauthenticated users are blocked.
+> ✅ You should be able to: Complete a mock interview → see it stored in PostgreSQL → view it on the CLI or DB tool. Data persists across restarts. No login required.
 
 ---
 
@@ -442,7 +390,8 @@ This is the longest and most important phase. Take your time with the learning s
 2. **What is Whisper?**
    - OpenAI's speech recognition model (open-source)
    - Takes: audio waveform (16kHz, mono, float32) → Returns: text with timestamps
-   - Model sizes: tiny, base, small, medium, large-v3 (bigger = more accurate = slower)
+   - Model sizes: tiny, base, small, medium, large-v3, distil-large-v3 (bigger = more accurate = slower)
+   - **distil-large-v3** = large-v3 accuracy at small model speed — best of both worlds
    - Resource: [Whisper paper (read the abstract + Section 2)](https://arxiv.org/abs/2212.04356)
 
 3. **What is faster-whisper?**
@@ -459,7 +408,8 @@ This is the longest and most important phase. Take your time with the learning s
 
 5. **CPU Inference on Your Ryzen 5 5600**
    - 6 cores / 12 threads — set `OMP_NUM_THREADS=6` (use physical cores, not logical)
-   - faster-whisper `base` + int8 on your CPU = real-time transcription
+   - faster-whisper `base` + int8 on your CPU = real-time transcription (for development)
+   - faster-whisper `distil-large-v3` + int8 = production quality at near-real-time speed
    - CTranslate2 uses OpenMP for CPU parallelism — thread tuning matters
 
 #### Key Concepts
@@ -478,7 +428,10 @@ This is the longest and most important phase. Take your time with the learning s
    - Load faster-whisper model once at startup (singleton):
      ```python
      from faster_whisper import WhisperModel
+     # Development: use "base" for speed
      model = WhisperModel("base", device="cpu", compute_type="int8")
+     # Production: use "distil-large-v3" for accuracy (near large-v3 quality, much faster)
+     model = WhisperModel("distil-large-v3", device="cpu", compute_type="int8")
      ```
    - Enable VAD filtering: `vad_filter=True`
 
@@ -495,11 +448,12 @@ This is the longest and most important phase. Take your time with the learning s
 
 ```python
 # Experiment 1: Compare model sizes on your Ryzen 5 5600
-for size in ["tiny", "base", "small"]:
+for size in ["tiny", "base", "small", "distil-large-v3"]:
     model = WhisperModel(size, device="cpu", compute_type="int8")
     segments, info = model.transcribe("test_audio.wav")
     # Measure: time, accuracy, RAM usage
-    # Expected: tiny ~1s, base ~3s, small ~6s for 10s audio
+    # Expected: tiny ~1s, base ~3s, small ~6s, distil-large-v3 ~4-5s for 10s audio
+    # distil-large-v3 has near-large-v3 accuracy at small-model speed!
 
 # Experiment 2: Compare compute types on CPU
 for ct in ["float32", "int8"]:
@@ -553,8 +507,9 @@ for threads in ["2", "4", "6", "8"]:
 
 5. **What is Quantization (for LLMs)?**
    - Float16: 7B model ≈ 14GB VRAM
-   - Q4_K_M: 7B model ≈ 4.5GB VRAM — fits easily in your 16GB
-   - Your 7800 XT can also run 14B models at Q4
+   - Q4_K_M: 9B model ≈ 6GB VRAM — fits easily in your 16GB
+   - Q4_K_M: 27B model ≈ 15-16GB VRAM — tight fit but possible on your 7800 XT
+   - Your 7800 XT can run up to 27B models at Q4 — a huge advantage over 8GB NVIDIA cards
 
 6. **Prompt Engineering**
    - System prompt = "You are an HR interviewer..."
@@ -579,23 +534,35 @@ for threads in ["2", "4", "6", "8"]:
 #### What to Build
 
 1. **Download a Model**
-   - HuggingFace → `Qwen2.5-7B-Instruct-GGUF` → `Q4_K_M` variant (~4.5GB)
+   - **Development:** HuggingFace → `unsloth/Qwen3.5-9B-GGUF` → `Q4_K_M` variant (~6GB)
+   - **Production:** HuggingFace → `unsloth/Qwen3.5-27B-GGUF` → `Q4_K_M` variant (~15-16GB)
    - Store in `models/` directory (git-ignored)
+   - Why Qwen3.5? Dual thinking/non-thinking modes, superior instruction following, role-playing, and multi-turn dialogue — exactly what an AI interviewer needs
 
 2. **Local LLM Provider** (`providers/local_llm.py`)
    - Implements `LLMProvider` protocol from Phase 2
    - Load model once at startup:
      ```python
      from llama_cpp import Llama
+     # Development: Qwen3.5-9B (~6GB VRAM, fast iteration)
      model = Llama(
-         model_path="models/qwen2.5-7b-instruct-q4_k_m.gguf",
+         model_path="models/qwen3.5-9b-q4_k_m.gguf",
          n_gpu_layers=-1,    # ALL layers on RX 7800 XT
          n_threads=6,         # CPU threads for your Ryzen 5
-         n_ctx=4096,
+         n_ctx=8192,          # Qwen3.5 supports larger context
+         verbose=True,
+     )
+     # Production: Qwen3.5-27B (~15-16GB VRAM, excellent quality)
+     model = Llama(
+         model_path="models/qwen3.5-27b-q4_k_m.gguf",
+         n_gpu_layers=-1,
+         n_threads=6,
+         n_ctx=8192,
          verbose=True,
      )
      ```
    - Stream tokens via async generator
+   - Use non-thinking mode for fast conversational responses, thinking mode for scoring/evaluation
 
 3. **Cloud LLM Provider** (`providers/cloud_llm.py`)
    - Same `LLMProvider` protocol
@@ -611,19 +578,24 @@ for threads in ["2", "4", "6", "8"]:
 
 ```python
 # Experiment 1: Verify Vulkan works
-model = Llama("models/qwen2.5-7b-instruct-q4_k_m.gguf", n_gpu_layers=-1, verbose=True)
+model = Llama("models/qwen3.5-9b-q4_k_m.gguf", n_gpu_layers=-1, verbose=True)
 # Look for: "ggml_vulkan: Found 1 Vulkan device: AMD Radeon RX 7800 XT"
 
 # Experiment 2: GPU vs CPU speed
-model_gpu = Llama(model_path, n_gpu_layers=-1, n_threads=6)  # ~20-40 tok/s
+model_gpu = Llama(model_path, n_gpu_layers=-1, n_threads=6)  # ~25-45 tok/s
 model_cpu = Llama(model_path, n_gpu_layers=0, n_threads=6)    # ~5-8 tok/s
 
-# Experiment 3: 7B vs 14B on your GPU
-# Both fit in 16GB. Compare quality vs speed.
+# Experiment 3: 9B vs 27B on your GPU
+# 9B (~6GB) for fast dev, 27B (~15-16GB) for production quality.
+# Compare quality vs speed on your 16GB 7800 XT.
 
 # Experiment 4: Temperature impact
 for temp in [0.0, 0.3, 0.5, 0.7, 1.0]:
     response = model.create_completion(prompt, temperature=temp)
+
+# Experiment 5: Thinking vs Non-Thinking mode (Qwen3.5 feature)
+# Non-thinking: fast conversational interview responses
+# Thinking: deeper analysis for scoring at end of interview
 ```
 
 ---
@@ -634,9 +606,16 @@ for temp in [0.0, 0.3, 0.5, 0.7, 1.0]:
 
 1. **How does TTS work?**
    - Text → linguistic analysis → acoustic model → audio waveform
-   - Resource: [Piper TTS docs](https://github.com/rhasspy/piper)
+   - Resource: [Kokoro TTS GitHub](https://github.com/hexgrad/kokoro)
 
-2. **Streaming TTS**
+2. **What is Kokoro TTS?**
+   - Open-source TTS model with only 82M parameters — tiny but near-human quality
+   - Supports English, Spanish, French, Italian, Japanese, and Mandarin
+   - Runs well on CPU (~2.5x real-time) — no GPU needed
+   - Install: `pip install kokoro`
+   - Dramatically more natural than Piper while still being CPU-friendly
+
+3. **Streaming TTS**
    - Don't wait for the LLM to finish — TTS **sentence by sentence**
    - This is called **sentence-level streaming** — key for low latency
 
@@ -644,9 +623,10 @@ for temp in [0.0, 0.3, 0.5, 0.7, 1.0]:
 
 1. **Local TTS Provider** (`providers/local_tts.py`)
    - Implements `TTSProvider` protocol
-   - Load Piper voice model at startup
+   - Load Kokoro voice model at startup (82M params, ~100MB)
    - Function: `text → audio bytes (PCM)`
    - Implement sentence-level processing
+   - Multiple voice options for different interviewer personas
 
 2. **Cloud TTS Provider** (`providers/cloud_tts.py`)
    - Same `TTSProvider` protocol
@@ -707,7 +687,7 @@ for temp in [0.0, 0.3, 0.5, 0.7, 1.0]:
 | ⚡ Performance | **Sentence-level TTS pipelining** — TTS sentence 1 while LLM generates sentence 2 |
 | ⚡ Performance | Set `OMP_NUM_THREADS=6` for your Ryzen 5 5600 |
 | ⚡ Performance | **Measure**: `stt_duration_ms`, `llm_time_to_first_token_ms`, `tokens_per_second`, `tts_duration_ms` |
-| ⚡ Performance | Run TTS on CPU while LLM runs on GPU — **no resource contention** |
+| ⚡ Performance | Run STT + TTS (Kokoro) on CPU while LLM runs on GPU — **no resource contention** |
 | ⚡ Performance | **Measure end-to-end latency**: `user_stops_speaking → AI_audio_starts_playing`. Target < 3s. |
 | ⚡ Performance | **Pre-warm all models** at startup — synthesize a test phrase, run a dummy inference |
 | 📈 Scalability | Provider pattern means you can flip to cloud APIs with one env var change |
@@ -834,17 +814,20 @@ for temp in [0.0, 0.3, 0.5, 0.7, 1.0]:
 │  ┌───────────────────┐        ┌──────────────────┐  │
 │  │ faster-whisper     │        │ llama.cpp        │  │
 │  │ (STT, int8)       │        │ (Vulkan backend) │  │
-│  │ ~500MB RAM         │        │ Qwen2.5-7B Q4    │  │
-│  │ OMP_THREADS=6      │        │ ~4.5GB VRAM      │  │
-│  └───────────────────┘        └──────────────────┘  │
-│                                                      │
-│  ┌───────────────────┐        Remaining VRAM:        │
-│  │ Piper TTS          │        ~11.5GB (room for     │
-│  │ ~100MB RAM         │        14B model or          │
-│  │ ~50x real-time     │        concurrent sessions)  │
+│  │ distil-large-v3    │        │                  │  │
+│  │ ~1GB RAM           │        │ Dev: Qwen3.5-9B  │  │
+│  │ OMP_THREADS=6      │        │      ~6GB VRAM   │  │
+│  └───────────────────┘        │                  │  │
+│                                │ Prod: Qwen3.5-27B│  │
+│  ┌───────────────────┐        │      ~15GB VRAM  │  │
+│  │ Kokoro TTS         │        └──────────────────┘  │
+│  │ 82M params         │                              │
+│  │ ~100MB RAM         │        Dev VRAM remaining:    │
+│  │ ~2.5x real-time    │        ~10GB (concurrent      │
+│  │ CPU only           │        sessions possible)     │
 │  └───────────────────┘                               │
 │                                                      │
-│  Total RAM needed: ~8GB system + 4.5GB VRAM          │
+│  Total RAM: ~8GB system + 6-15GB VRAM (model size)   │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -852,11 +835,11 @@ for temp in [0.0, 0.3, 0.5, 0.7, 1.0]:
 
 | Component | Speed | Status |
 |---|---|---|
-| Whisper `base` int8 (CPU) | 10s audio in ~2-3s | ✅ Real-time capable |
-| Whisper `small` int8 (CPU) | 10s audio in ~5-6s | ✅ Usable with VAD |
-| Qwen2.5-7B Q4_K_M (GPU Vulkan) | ~20-40 tok/s | 🚀 Excellent |
-| Qwen2.5-14B Q4_K_M (GPU Vulkan) | ~10-20 tok/s | ✅ Good quality bump |
-| Piper TTS (CPU) | ~50x real-time | ✅ Instant |
+| Whisper `base` int8 (CPU) | 10s audio in ~2-3s | ✅ Dev: real-time capable |
+| Whisper `distil-large-v3` int8 (CPU) | 10s audio in ~4-5s | 🚀 Prod: near-large-v3 accuracy |
+| Qwen3.5-9B Q4_K_M (GPU Vulkan) | ~25-45 tok/s | 🚀 Dev: fast + great quality |
+| Qwen3.5-27B Q4_K_M (GPU Vulkan) | ~10-20 tok/s | 🚀 Prod: excellent quality |
+| Kokoro TTS 82M (CPU) | ~2.5x real-time | ✅ Near-human naturalness |
 | **End-to-end latency** | **~2-3 seconds** | ✅ **Target met** |
 
 > **Future GPU upgrade path:** If you get an NVIDIA GPU, the only changes are:
@@ -872,7 +855,7 @@ for temp in [0.0, 0.3, 0.5, 0.7, 1.0]:
 Phase 0: Project setup                    [1-2 days]   ← You know this
 Phase 1: Frontend (Angular + Audio)       [5-7 days]   ← You know this + Angular + Web Audio
 Phase 2: Backend (FastAPI + Interfaces)   [3-5 days]   ← You know this + pluggable design
-Phase 3: Auth & Data Layer                [5-7 days]   ← You know this + JWT auth
+Phase 3: Data Layer (no auth)         [3-5 days]   ← PostgreSQL + Redis persistence
 Phase 4: AI Models + Pipeline             [10-14 days] ← 🧠🧠 CORE AI SKILLS
 Phase 5: Billing & Production             [7-10 days]  ← You know this + Stripe
 Phase 6: Advanced AI                      [Ongoing]    ← 🧠🧠🧠 GROWTH
@@ -886,7 +869,7 @@ Total estimated time: 6-8 weeks (part-time)
 
 1. **Don't optimize early.** Get the ugly version working first. Optimize latency after.
 2. **Log everything.** Timestamps at each stage (audio received, STT done, LLM first token, TTS first chunk). This is how you find bottlenecks.
-3. **Small models first.** Use Whisper `tiny`, Qwen2.5-3B while developing. Switch to larger models only when testing quality.
+3. **Small models first.** Use Whisper `base`, Qwen3.5-9B while developing. Switch to `distil-large-v3` and Qwen3.5-27B when testing quality.
 4. **Security is not Phase 5.** The checklists above embed security into every phase. Don't bolt it on at the end.
 5. **Your AMD GPU is an advantage.** 16GB VRAM > 8GB NVIDIA in practice. Vulkan support in llama.cpp is mature.
 6. **Build the interfaces first, models second.** The pluggable provider pattern from Phase 2 is your most important architectural decision.

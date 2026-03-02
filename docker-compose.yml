@@ -26,26 +26,40 @@ services:
       - ./backend:/app
       - ./models:/app/models
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
-  # --- PostgreSQL (Phase 3) ---
-  # postgres:
-  #   image: postgres:16-alpine
-  #   environment:
-  #     POSTGRES_DB: ${POSTGRES_DB}
-  #     POSTGRES_USER: ${POSTGRES_USER}
-  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-  #   ports:
-  #     - "${POSTGRES_PORT}:5432"
-  #   volumes:
-  #     - docker-data/postgres:/var/lib/postgresql/data
+  # --- PostgreSQL ---
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ai_interview}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  # --- Redis (Phase 3) ---
-  # redis:
-  #   image: redis:7-alpine
-  #   ports:
-  #     - "${REDIS_PORT}:6379"
-
-  # --- MinIO (Phase 3) ---
+  # --- Redis ---
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  # --- MinIO (Phase 6 — deferred) ---
   # minio:
   #   image: minio/minio
   #   command: server /data --console-address ":9001"
@@ -56,4 +70,7 @@ services:
   #     MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
   #     MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
   #   volumes:
-  #     - docker-data/minio:/data
+  #     - minio_data:/data
+
+volumes:
+  pgdata:
