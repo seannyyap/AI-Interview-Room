@@ -7,10 +7,18 @@ pytest==8.0.0
 pytest-asyncio==0.23.5
 httpx==0.27.0
 
-# Phase 5 — Auth & Data Layer
+# Phase 3 — Data Layer
 sqlalchemy[asyncio]==2.0.35
 asyncpg==0.30.0
 alembic==1.13.1
 redis[hiredis]==5.0.1
-aiosqlite==0.22.1
 psycopg2-binary==2.9.11
+
+# Phase 4 — AI Providers (local)
+faster-whisper==1.1.0
+kokoro==0.9.4
+soundfile==0.13.1
+llama-cpp-python==0.2.90
+
+# Phase 4 — AI Providers (cloud)
+openai>=1.40.0

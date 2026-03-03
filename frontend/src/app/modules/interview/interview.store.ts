@@ -42,8 +42,24 @@ export const InterviewStore = signalStore(
         setConnectionState(connectionState: ConnectionState) {
             patchState(store, { connectionState });
         },
-        addMessage(message: Message) {
-            patchState(store, (state) => ({ transcript: [...state.transcript, message] }));
+        upsertMessage(message: Message) {
+            patchState(store, (state) => {
+                const transcript = [...state.transcript];
+                const lastIdx = transcript.length - 1;
+
+                // If same role and last message exists, append to it
+                if (lastIdx >= 0 && transcript[lastIdx].role === message.role) {
+                    transcript[lastIdx] = {
+                        ...transcript[lastIdx],
+                        text: transcript[lastIdx].text + message.text,
+                        timestamp: message.timestamp || transcript[lastIdx].timestamp
+                    };
+                    return { transcript };
+                }
+
+                // Otherwise add as new message block
+                return { transcript: [...transcript, message] };
+            });
         },
         toggleMicrophone(isActive: boolean) {
             patchState(store, { isMicrophoneActive: isActive });

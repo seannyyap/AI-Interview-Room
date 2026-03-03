@@ -6,6 +6,7 @@ import { InterviewStatus, Role } from '../../../../shared/models/interview.model
 import { ConnectionState } from '../../../../shared/models/websocket.models';
 import { AudioCaptureService } from '../../../../shared/services/audio-capture.service';
 import { WebSocketService } from '../../../../shared/services/websocket.service';
+import { AudioPlaybackService } from '../../../../shared/services/audio-playback.service';
 
 @Component({
   selector: 'app-interview-console',
@@ -23,10 +24,12 @@ export class InterviewConsoleComponent implements OnDestroy {
 
   private audioCapture = inject(AudioCaptureService);
   private wsService = inject(WebSocketService);
+  private audioPlayback = inject(AudioPlaybackService);
   private audioSub: Subscription | null = null;
   private transcriptSub: Subscription | null = null;
   private aiResponseSub: Subscription | null = null;
-  private errorSub: Subscription | null = null; // Phase 4: WS error sub
+  private silenceSub: Subscription | null = null;
+  private errorSub: Subscription | null = null;
 
   /**
    * Toggle microphone: start/stop audio capture and WebSocket streaming.
@@ -102,30 +105,73 @@ export class InterviewConsoleComponent implements OnDestroy {
       this.store.toggleMicrophone(true);
       this.store.setStatus(InterviewStatus.LISTENING);
 
+      // Tell backend to start the interview session
+      this.wsService.sendMessage({
+        type: 'interview-start',
+        config: {
+          position: 'Software Engineer', // Default — in real app, get from store/form
+          difficulty: 'medium'
+        }
+      });
+
       // Pipe audio chunks to WebSocket
       this.audioSub = this.audioCapture.audioChunks$.subscribe((chunk) => {
         this.wsService.sendAudioChunk(chunk);
       });
 
-      // Listen for transcript updates
+      // Listen for transcript updates (User Speaking)
       this.transcriptSub = this.wsService.transcript$.subscribe((msg) => {
+        this.store.upsertMessage({
+          role: Role.USER,
+          text: msg.text,
+          timestamp: msg.timestamp,
+        });
+
         if (msg.isFinal) {
-          this.store.addMessage({
-            role: Role.USER,
-            text: msg.text,
-            timestamp: msg.timestamp,
-          });
+          // Additional logic if needed for final user transcript
         }
       });
 
-      // Listen for AI responses
+      // Listen for AI responses (Bot Speaking)
       this.aiResponseSub = this.wsService.aiResponse$.subscribe((msg) => {
+        this.store.upsertMessage({
+          role: Role.AI,
+          text: msg.text,
+          timestamp: msg.timestamp,
+        });
+
         if (msg.isComplete) {
-          this.store.addMessage({
-            role: Role.AI,
-            text: msg.text,
-            timestamp: msg.timestamp,
-          });
+          this.store.setStatus(InterviewStatus.LISTENING);
+        } else {
+          this.store.setStatus(InterviewStatus.PROCESSING);
+        }
+      });
+
+      // Listen for silence (Client-Side VAD)
+      this.silenceSub = this.audioCapture.silenceDetected$.subscribe((isSilent) => {
+        const currentStatus = this.store.status();
+
+        if (isSilent) {
+          // Rule: If we were listening and it's now silent for 1s, trigger speech-end
+          if (currentStatus === InterviewStatus.LISTENING) {
+            console.log('[Console] Silence detected — sending speech-end');
+            this.wsService.sendMessage({ type: 'speech-end' });
+            this.store.setStatus(InterviewStatus.PROCESSING);
+          }
+        } else {
+          // Rule: If the user STARTS speaking (isSilent=false) while AI is busy, BARGE-IN!
+          if (currentStatus === InterviewStatus.PROCESSING || this.audioPlayback.isPlaying()) {
+            console.log('[Console] User barge-in detected — interrupting AI');
+
+            // 1. Stop local audio immediately
+            this.audioPlayback.stop();
+
+            // 2. Tell backend to stop LLM/TTS
+            this.wsService.sendMessage({ type: 'ai-interrupt' });
+
+            // 3. Reset UI to listening to show we are following user
+            this.store.setStatus(InterviewStatus.LISTENING);
+          }
         }
       });
 
@@ -147,6 +193,8 @@ export class InterviewConsoleComponent implements OnDestroy {
     this.transcriptSub = null;
     this.aiResponseSub?.unsubscribe();
     this.aiResponseSub = null;
+    this.silenceSub?.unsubscribe();
+    this.silenceSub = null;
     this.errorSub?.unsubscribe();
     this.errorSub = null;
 

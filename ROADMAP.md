@@ -19,7 +19,7 @@
 
 ### Architecture — Pluggable AI Backends
 
-> **Key design decision:** Every AI service (STT, LLM, TTS) is built behind an abstract interface from day one. You develop with local models, but can swap to cloud APIs (Deepgram, OpenAI, ElevenLabs) for production without touching business logic.
+> **Key design decision:** Every AI service (STT, LLM, TTS) is built behind an abstract interface from day one. You develop with local models (Ollama for LLM), but can swap to cloud APIs (Deepgram, OpenAI, ElevenLabs) for production without touching business logic.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -37,7 +37,7 @@
 │ Provider │    │ Provider    │    │ Provider    │
 ├──────────┤    ├─────────────┤    ├─────────────┤
 │ Local:   │    │ Local:      │    │ Local:      │
-│ Whisper  │    │ llama.cpp   │    │ Piper       │
+│ Whisper  │    │ Ollama      │    │ Kokoro      │
 │ Cloud:   │    │ Cloud:      │    │ Cloud:      │
 │ Deepgram │    │ OpenAI/     │    │ ElevenLabs  │
 │          │    │ Anthropic   │    │             │
@@ -837,10 +837,10 @@ for temp in [0.0, 0.3, 0.5, 0.7, 1.0]:
 |---|---|---|
 | Whisper `base` int8 (CPU) | 10s audio in ~2-3s | ✅ Dev: real-time capable |
 | Whisper `distil-large-v3` int8 (CPU) | 10s audio in ~4-5s | 🚀 Prod: near-large-v3 accuracy |
-| Qwen3.5-9B Q4_K_M (GPU Vulkan) | ~25-45 tok/s | 🚀 Dev: fast + great quality |
-| Qwen3.5-27B Q4_K_M (GPU Vulkan) | ~10-20 tok/s | 🚀 Prod: excellent quality |
+| Qwen2.5-7B (Ollama GPU) | ~35-55 tok/s | 🚀 Dev: fast + great quality |
+| Qwen2.5-14B (Ollama GPU) | ~20-30 tok/s | 🚀 Prod: excellent quality |
 | Kokoro TTS 82M (CPU) | ~2.5x real-time | ✅ Near-human naturalness |
-| **End-to-end latency** | **~2-3 seconds** | ✅ **Target met** |
+| **End-to-end latency** | **~1-2 seconds** | ✅ **Target met** |
 
 > **Future GPU upgrade path:** If you get an NVIDIA GPU, the only changes are:
 > 1. `device="cpu"` → `device="cuda"` in faster-whisper

@@ -1,4 +1,4 @@
-import { Injectable, OnDestroy, signal, computed } from '@angular/core';
+import { Injectable, OnDestroy, signal, computed, inject } from '@angular/core';
 import { Subject, Observable } from 'rxjs';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 import {
@@ -6,8 +6,10 @@ import {
     IncomingMessage,
     TranscriptMessage,
     AIResponseMessage,
+    TTSAudioMetaMessage,
     ErrorMessage,
 } from '../models/websocket.models';
+import { AudioPlaybackService } from './audio-playback.service';
 import { environment } from '../../../environments/environment';
 
 /**
@@ -35,6 +37,7 @@ export class WebSocketService implements OnDestroy {
     // --- Subjects for incoming message streams ---
     private transcriptSubject = new Subject<TranscriptMessage>();
     private aiResponseSubject = new Subject<AIResponseMessage>();
+    private ttsAudioSubject = new Subject<TTSAudioMetaMessage>();
     private errorSubject = new Subject<ErrorMessage>();
 
     /** Stream of transcript messages from the server */
@@ -43,8 +46,13 @@ export class WebSocketService implements OnDestroy {
     /** Stream of AI response messages from the server */
     readonly aiResponse$: Observable<AIResponseMessage> = this.aiResponseSubject.asObservable();
 
+    /** Stream of TTS audio metadata from the server */
+    readonly ttsAudio$: Observable<TTSAudioMetaMessage> = this.ttsAudioSubject.asObservable();
+
     /** Stream of error messages from the server */
     readonly error$: Observable<ErrorMessage> = this.errorSubject.asObservable();
+
+    private audioPlayback = inject(AudioPlaybackService);
 
     constructor() {
         console.log('[WebSocketService] Initialized');
@@ -66,7 +74,12 @@ export class WebSocketService implements OnDestroy {
         this.socket$ = webSocket({
             url: wsUrl,
             deserializer: (msg) => msg.data,
-            serializer: (msg) => msg,
+            serializer: (msg) => {
+                if (msg instanceof ArrayBuffer || msg instanceof Blob) {
+                    return msg;
+                }
+                return JSON.stringify(msg);
+            },
             binaryType: 'arraybuffer',
             openObserver: {
                 next: () => {
@@ -142,7 +155,8 @@ export class WebSocketService implements OnDestroy {
 
     private handleRawMessage(data: any): void {
         if (data instanceof ArrayBuffer) {
-            // Audio response handling will be added in Phase 4
+            // Phase 4: Forward TTS audio to the playback service
+            this.audioPlayback.enqueue(data);
             return;
         }
 
@@ -155,6 +169,11 @@ export class WebSocketService implements OnDestroy {
                     break;
                 case 'ai-response':
                     this.aiResponseSubject.next(message as AIResponseMessage);
+                    break;
+                case 'tts-audio':
+                    // Metadata arrives before the binary payload — configure playback
+                    this.audioPlayback.setSampleRate((message as TTSAudioMetaMessage).sampleRate);
+                    this.ttsAudioSubject.next(message as TTSAudioMetaMessage);
                     break;
                 case 'error':
                     this.errorSubject.next(message as ErrorMessage);
@@ -204,6 +223,7 @@ export class WebSocketService implements OnDestroy {
         this.disconnect();
         this.transcriptSubject.complete();
         this.aiResponseSubject.complete();
+        this.ttsAudioSubject.complete();
         this.errorSubject.complete();
     }
 }

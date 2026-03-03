@@ -18,10 +18,23 @@ export class AudioCaptureService implements OnDestroy {
     private workletNode: AudioWorkletNode | null = null;
 
     private audioChunksSubject = new Subject<Float32Array>();
+    private silenceDetectionSubject = new Subject<boolean>();
     private isCapturing = false;
+    private silenceTimer: any = null;
+
+    // --- Noise Robustness Properties ---
+    private noiseFloor = 0.005;
+    private isActiveSpeech = false;
+    private speechStrikes = 0; // Require consecutive frames to confirm speech
+    private readonly NOISE_ADAPT_SPEED = 0.98; // Slower adaptation to noise
+    private readonly SPEECH_MULTIPLIER = 4.0;  // Higher threshold (4x floor)
+    private readonly SILENCE_WAIT_MS = 1000;
 
     /** Observable stream of 16kHz mono Float32 PCM chunks (~250ms each) */
     readonly audioChunks$: Observable<Float32Array> = this.audioChunksSubject.asObservable();
+
+    /** Emits true when silence is detected for > 1s, false when speech resumes */
+    readonly silenceDetected$: Observable<boolean> = this.silenceDetectionSubject.asObservable();
 
     constructor(private deviceManager: DeviceManagerService) { }
 
@@ -71,15 +84,53 @@ export class AudioCaptureService implements OnDestroy {
                 if (event.data?.type === 'audio-chunk') {
                     const chunk = new Float32Array(event.data.data);
 
-                    // Phase 4: Calculate real-time volume (RMS) for the AI Orb
+                    // Phase 4: Calculate real-time volume (RMS)
                     let sumSquares = 0;
                     for (let i = 0; i < chunk.length; i++) {
                         sumSquares += chunk[i] * chunk[i];
                     }
                     const rms = Math.sqrt(sumSquares / chunk.length);
-                    // Map RMS to 0.0 - 1.0 range (RMS usually peaks around 0.5-0.7 for loud speech)
+
+                    // Map RMS to 0.0 - 1.0 range for UI
                     const normalizedVolume = Math.min(1, rms * 10);
                     this.deviceManager.micLevel.set(normalizedVolume);
+
+                    // --- Adaptive Noise & VAD ---
+                    const speechThreshold = this.noiseFloor * this.SPEECH_MULTIPLIER;
+
+                    if (rms < speechThreshold) {
+                        // Slowly adapt the noise floor downward if the room is quiet
+                        this.noiseFloor = (this.noiseFloor * this.NOISE_ADAPT_SPEED) + (rms * (1 - this.NOISE_ADAPT_SPEED));
+                        this.speechStrikes = 0; // Reset confirmation strikes
+
+                        if (this.isActiveSpeech) {
+                            // Only start the silence timer if we were previously talking
+                            if (!this.silenceTimer) {
+                                this.silenceTimer = setTimeout(() => {
+                                    console.log('[AudioCapture] Silence met (Adaptive Floor)');
+                                    this.silenceDetectionSubject.next(true);
+                                    this.isActiveSpeech = false;
+                                }, this.SILENCE_WAIT_MS);
+                            }
+                        }
+                    } else {
+                        // Potential speech detected! 
+                        this.speechStrikes++;
+
+                        if (this.silenceTimer) {
+                            clearTimeout(this.silenceTimer);
+                            this.silenceTimer = null;
+                        }
+
+                        // Require 2 consecutive frames (~500ms total) to confirm it's not a blip
+                        if (this.speechStrikes >= 2) {
+                            if (!this.isActiveSpeech) {
+                                console.log('[AudioCapture] Active speech confirmed (Barge-in ready)');
+                            }
+                            this.isActiveSpeech = true;
+                            this.silenceDetectionSubject.next(false);
+                        }
+                    }
 
                     this.audioChunksSubject.next(chunk);
                 }
@@ -109,6 +160,11 @@ export class AudioCaptureService implements OnDestroy {
         if (this.sourceNode) {
             this.sourceNode.disconnect();
             this.sourceNode = null;
+        }
+
+        if (this.silenceTimer) {
+            clearTimeout(this.silenceTimer);
+            this.silenceTimer = null;
         }
 
         if (this.mediaStream) {

@@ -1,6 +1,6 @@
 """
 Async SQLAlchemy 2.0 database engine and session factory.
-Uses asyncpg for PostgreSQL (standard) with aiosqlite as a local fallback.
+Uses asyncpg for PostgreSQL.
 """
 import os
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
@@ -27,8 +27,8 @@ db_url = _build_db_url()
 engine = create_async_engine(
     db_url,
     echo=False,        # Set True for SQL debugging
-    # Only set pool settings for PostgreSQL
-    **({"pool_size": 5, "max_overflow": 10} if "postgresql" in db_url else {}),
+    pool_size=5,
+    max_overflow=10,
 )
 
 AsyncSessionFactory = async_sessionmaker(

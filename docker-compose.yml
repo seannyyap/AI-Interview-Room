@@ -1,37 +1,6 @@
 version: "3.9"
 
 services:
-  # --- Frontend (Angular) ---
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "4200:4200"
-    volumes:
-      - ./frontend/src:/app/src
-    depends_on:
-      - backend
-
-  # --- Backend (FastAPI) ---
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    volumes:
-      - ./backend:/app
-      - ./models:/app/models
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
   # --- PostgreSQL ---
   postgres:
     image: postgres:16-alpine
@@ -59,18 +28,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-  # --- MinIO (Phase 6 — deferred) ---
-  # minio:
-  #   image: minio/minio
-  #   command: server /data --console-address ":9001"
-  #   ports:
-  #     - "9000:9000"
-  #     - "9001:9001"
-  #   environment:
-  #     MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
-  #     MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
-  #   volumes:
-  #     - minio_data:/data
 
 volumes:
   pgdata:
