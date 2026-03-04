@@ -180,7 +180,16 @@ export class WebSocketService implements OnDestroy {
                     console.error('[WebSocket] Server error:', message.message);
                     break;
                 case 'status':
-                    console.log('[WebSocket] Status:', message.status);
+                    console.log('[WebSocket] Status:', (message as any).status);
+                    break;
+                case 'profiler-stats':
+                    const s = message as any;
+                    console.log(`%c[Pipeline Profiler] 
+  STT (Whisper): ${s.stt_ms}ms
+  LLM TTFT (Groq): ${s.llm_ttft_ms}ms
+  LLM Total: ${s.llm_total_ms}ms
+  TTS Total (Kokoro): ${s.tts_total_ms}ms
+  End-to-End: ${s.total_e2e_ms}ms`, 'color: #00ff00; font-weight: bold;');
                     break;
                 default:
                     console.warn('[WebSocket] Unknown message type:', message);

@@ -1,9 +1,7 @@
-import { Component, ChangeDetectionStrategy, inject, OnDestroy, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, ChangeDetectionStrategy, inject, OnDestroy, signal, effect } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { InterviewStore } from '../../interview.store';
 import { InterviewStatus, Role } from '../../../../shared/models/interview.model';
-import { ConnectionState } from '../../../../shared/models/websocket.models';
 import { AudioCaptureService } from '../../../../shared/services/audio-capture.service';
 import { WebSocketService } from '../../../../shared/services/websocket.service';
 import { AudioPlaybackService } from '../../../../shared/services/audio-playback.service';
@@ -30,6 +28,20 @@ export class InterviewConsoleComponent implements OnDestroy {
   private aiResponseSub: Subscription | null = null;
   private silenceSub: Subscription | null = null;
   private errorSub: Subscription | null = null;
+
+  private textGenerationComplete = false;
+
+  constructor() {
+    // Effect to return to LISTENING status only after audio finishes playing
+    effect(() => {
+      const isPlaying = this.audioPlayback.isPlaying();
+      if (!isPlaying && this.textGenerationComplete && this.store.status() === InterviewStatus.PROCESSING) {
+        console.log('[Console Decision] AI playback finished. Returning to LISTENING.');
+        this.store.setStatus(InterviewStatus.LISTENING);
+        this.textGenerationComplete = false; // Reset for next turn
+      }
+    });
+  }
 
   /**
    * Toggle microphone: start/stop audio capture and WebSocket streaming.
@@ -102,6 +114,11 @@ export class InterviewConsoleComponent implements OnDestroy {
 
       // Start audio capture
       await this.audioCapture.start();
+
+      // Phase 4/5: Preemptively initialize and resume the playback AudioContext 
+      // during this user gesture to satisfy browser autoplay policies.
+      await this.audioPlayback.ensureUnlocked();
+
       this.store.toggleMicrophone(true);
       this.store.setStatus(InterviewStatus.LISTENING);
 
@@ -141,8 +158,14 @@ export class InterviewConsoleComponent implements OnDestroy {
         });
 
         if (msg.isComplete) {
-          this.store.setStatus(InterviewStatus.LISTENING);
+          this.textGenerationComplete = true;
+          // Only return to LISTENING if audio is already finished playing.
+          // Otherwise, the playback listener below will handle it.
+          if (!this.audioPlayback.isPlaying()) {
+            this.store.setStatus(InterviewStatus.LISTENING);
+          }
         } else {
+          this.textGenerationComplete = false;
           this.store.setStatus(InterviewStatus.PROCESSING);
         }
       });
@@ -151,27 +174,25 @@ export class InterviewConsoleComponent implements OnDestroy {
       this.silenceSub = this.audioCapture.silenceDetected$.subscribe((isSilent) => {
         const currentStatus = this.store.status();
 
+        // --- Half-Duplex Logic ---
+        // If the AI is currently working or playing audio, IGNORE all microphone triggers.
+        // This ensures the AI is never interrupted and avoids echo-induced loops.
+        if (currentStatus === InterviewStatus.PROCESSING || this.audioPlayback.isPlaying()) {
+          // Do nothing while AI has the "floor"
+          return;
+        }
+
         if (isSilent) {
           // Rule: If we were listening and it's now silent for 1s, trigger speech-end
           if (currentStatus === InterviewStatus.LISTENING) {
-            console.log('[Console] Silence detected — sending speech-end');
+            console.log('[Console Decision] Rule: Silence (1.0s met) -> sending speech-end to server');
             this.wsService.sendMessage({ type: 'speech-end' });
             this.store.setStatus(InterviewStatus.PROCESSING);
           }
         } else {
-          // Rule: If the user STARTS speaking (isSilent=false) while AI is busy, BARGE-IN!
-          if (currentStatus === InterviewStatus.PROCESSING || this.audioPlayback.isPlaying()) {
-            console.log('[Console] User barge-in detected — interrupting AI');
-
-            // 1. Stop local audio immediately
-            this.audioPlayback.stop();
-
-            // 2. Tell backend to stop LLM/TTS
-            this.wsService.sendMessage({ type: 'ai-interrupt' });
-
-            // 3. Reset UI to listening to show we are following user
-            this.store.setStatus(InterviewStatus.LISTENING);
-          }
+          // Rule: User STARTS speaking (isSilent=false)
+          console.log('[Console Decision] Rule: Speech Start Detected -> sending speech-start to server to clear buffers');
+          this.wsService.sendMessage({ type: 'speech-start' });
         }
       });
 

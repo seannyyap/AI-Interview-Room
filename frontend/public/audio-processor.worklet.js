@@ -74,7 +74,7 @@ class AudioCaptureProcessor extends AudioWorkletProcessor {
             }, [chunk.buffer]); // Transfer ownership for zero-copy
         }
 
-        return true; // Keep processor alive
+        return true;
     }
 }
 

@@ -16,19 +16,29 @@ export class AudioCaptureService implements OnDestroy {
     private mediaStream: MediaStream | null = null;
     private sourceNode: MediaStreamAudioSourceNode | null = null;
     private workletNode: AudioWorkletNode | null = null;
-
+    private isCapturing = false;
     private audioChunksSubject = new Subject<Float32Array>();
     private silenceDetectionSubject = new Subject<boolean>();
-    private isCapturing = false;
-    private silenceTimer: any = null;
 
-    // --- Noise Robustness Properties ---
-    private noiseFloor = 0.005;
-    private isActiveSpeech = false;
-    private speechStrikes = 0; // Require consecutive frames to confirm speech
-    private readonly NOISE_ADAPT_SPEED = 0.98; // Slower adaptation to noise
-    private readonly SPEECH_MULTIPLIER = 4.0;  // Higher threshold (4x floor)
-    private readonly SILENCE_WAIT_MS = 1000;
+    // --- FFT VAD Properties ---
+    private analyser: AnalyserNode | null = null;
+    private vadFrameId = 0;
+    private readonly FFT_SIZE = 512;
+    private readonly MIN_FREQ = 300;   // Hz (Ignore low rumble)
+    private readonly MAX_FREQ = 3000;  // Hz (Ignore high hiss/clicks)
+    // --- Hysteresis Thresholds ---
+    // Raised to 160 to safely clear the user's peak noise/echo floor (~118 seen in logs)
+    private readonly START_THRESHOLD = 160;
+    // Kept at 110 to ensure echo doesn't keep the VAD "active" forever
+    private readonly HOLD_THRESHOLD = 110;
+
+    // Increased to 10 (~166ms) to filter out sharp desk bumps/claps
+    private readonly REQUIRED_FRAMES = 10;
+    private readonly SILENCE_FRAMES = 120; // ~2.0s for natural thinking/pause room
+
+    private activeFrames = 0;
+    private silenceFramesCount = 0;
+    private isSpeechActive = false;
 
     /** Observable stream of 16kHz mono Float32 PCM chunks (~250ms each) */
     readonly audioChunks$: Observable<Float32Array> = this.audioChunksSubject.asObservable();
@@ -79,69 +89,39 @@ export class AudioCaptureService implements OnDestroy {
             // 5. Create worklet node
             this.workletNode = new AudioWorkletNode(this.audioContext, 'audio-capture-processor');
 
-            // 6. Listen for audio chunks from the worklet
-            this.workletNode.port.onmessage = (event: MessageEvent) => {
-                if (event.data?.type === 'audio-chunk') {
-                    const chunk = new Float32Array(event.data.data);
+            // 6. Set up AnalyserNode for FFT VAD
+            this.analyser = this.audioContext.createAnalyser();
+            this.analyser.fftSize = this.FFT_SIZE;
+            this.analyser.smoothingTimeConstant = 0.2; // Fast response
+            this.sourceNode.connect(this.analyser);
 
-                    // Phase 4: Calculate real-time volume (RMS)
+            // 7. Listen for raw bytes from the worklet (now just downsampling)
+            this.workletNode.port.onmessage = (event: MessageEvent) => {
+                const data = event.data;
+                if (data && data.type === 'audio-chunk') {
+                    const chunk = new Float32Array(data.data);
+
+                    // Simple RMS fallback for UI volume meter if preferred,
+                    // or we could use the analyser data. For now, we compute an RMS of the chunk.
                     let sumSquares = 0;
                     for (let i = 0; i < chunk.length; i++) {
                         sumSquares += chunk[i] * chunk[i];
                     }
                     const rms = Math.sqrt(sumSquares / chunk.length);
-
-                    // Map RMS to 0.0 - 1.0 range for UI
                     const normalizedVolume = Math.min(1, rms * 10);
                     this.deviceManager.micLevel.set(normalizedVolume);
-
-                    // --- Adaptive Noise & VAD ---
-                    const speechThreshold = this.noiseFloor * this.SPEECH_MULTIPLIER;
-
-                    if (rms < speechThreshold) {
-                        // Slowly adapt the noise floor downward if the room is quiet
-                        this.noiseFloor = (this.noiseFloor * this.NOISE_ADAPT_SPEED) + (rms * (1 - this.NOISE_ADAPT_SPEED));
-                        this.speechStrikes = 0; // Reset confirmation strikes
-
-                        if (this.isActiveSpeech) {
-                            // Only start the silence timer if we were previously talking
-                            if (!this.silenceTimer) {
-                                this.silenceTimer = setTimeout(() => {
-                                    console.log('[AudioCapture] Silence met (Adaptive Floor)');
-                                    this.silenceDetectionSubject.next(true);
-                                    this.isActiveSpeech = false;
-                                }, this.SILENCE_WAIT_MS);
-                            }
-                        }
-                    } else {
-                        // Potential speech detected! 
-                        this.speechStrikes++;
-
-                        if (this.silenceTimer) {
-                            clearTimeout(this.silenceTimer);
-                            this.silenceTimer = null;
-                        }
-
-                        // Require 2 consecutive frames (~500ms total) to confirm it's not a blip
-                        if (this.speechStrikes >= 2) {
-                            if (!this.isActiveSpeech) {
-                                console.log('[AudioCapture] Active speech confirmed (Barge-in ready)');
-                            }
-                            this.isActiveSpeech = true;
-                            this.silenceDetectionSubject.next(false);
-                        }
-                    }
 
                     this.audioChunksSubject.next(chunk);
                 }
             };
 
-            // 7. Connect: mic → worklet → (nowhere, we just capture)
+            // 8. Connect: mic → worklet → (nowhere, we just capture)
             this.sourceNode.connect(this.workletNode);
-            this.workletNode.connect(this.audioContext.destination); // Required for process() to be called
+            this.workletNode.connect(this.audioContext.destination);
 
             this.isCapturing = true;
-            console.log('[AudioCapture] Started — 16kHz mono chunks streaming');
+            this.startFFTVAD();
+            console.log('[AudioCapture] Started — 16kHz mono chunks streaming (FFT VAD Active)');
         } catch (error) {
             console.error('[AudioCapture] Failed to start:', error);
             this.stop();
@@ -151,6 +131,13 @@ export class AudioCaptureService implements OnDestroy {
 
     /** Stop capturing audio and release all resources. */
     stop(): void {
+        this.stopFFTVAD();
+
+        if (this.analyser) {
+            this.analyser.disconnect();
+            this.analyser = null;
+        }
+
         if (this.workletNode) {
             this.workletNode.port.onmessage = null;
             this.workletNode.disconnect();
@@ -160,11 +147,6 @@ export class AudioCaptureService implements OnDestroy {
         if (this.sourceNode) {
             this.sourceNode.disconnect();
             this.sourceNode = null;
-        }
-
-        if (this.silenceTimer) {
-            clearTimeout(this.silenceTimer);
-            this.silenceTimer = null;
         }
 
         if (this.mediaStream) {
@@ -179,6 +161,76 @@ export class AudioCaptureService implements OnDestroy {
 
         this.isCapturing = false;
         console.log('[AudioCapture] Stopped');
+    }
+
+    // --- Native FFT Voice Activity Detection ---
+    private startFFTVAD(): void {
+        if (!this.analyser || !this.audioContext) return;
+
+        const bufferLength = this.analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        const sampleRate = this.audioContext.sampleRate; // usually 48000
+        const hzPerBin = (sampleRate / 2) / bufferLength;
+
+        // Calculate which bins correspond to 300Hz - 3000Hz (human speech)
+        const minBin = Math.floor(this.MIN_FREQ / hzPerBin);
+        const maxBin = Math.ceil(this.MAX_FREQ / hzPerBin);
+
+        const checkVAD = () => {
+            if (!this.isCapturing || !this.analyser) return;
+
+            this.analyser.getByteFrequencyData(dataArray);
+            let peakEnergy = 0;
+            let totalEnergy = 0;
+            for (let i = minBin; i <= maxBin; i++) {
+                if (dataArray[i] > peakEnergy) {
+                    peakEnergy = dataArray[i];
+                }
+                totalEnergy += dataArray[i];
+            }
+            const averageEnergy = Math.round(totalEnergy / (maxBin - minBin + 1));
+
+            const currentThreshold = this.isSpeechActive ? this.HOLD_THRESHOLD : this.START_THRESHOLD;
+
+            // Calibration Telemetry: Log the peak energy every ~1 second (60 frames)
+            if (this.vadFrameId % 60 === 0) {
+                console.log(`[VAD Telemetry] Peak: ${peakEnergy} | Avg: ${averageEnergy} | ActiveFrames: ${this.activeFrames}/${this.REQUIRED_FRAMES} | SilenceFrames: ${this.silenceFramesCount}/${this.SILENCE_FRAMES} | Threshold: ${currentThreshold}`);
+            }
+
+            if (peakEnergy > currentThreshold) {
+                this.activeFrames++;
+                this.silenceFramesCount = 0;
+
+                if (this.activeFrames >= this.REQUIRED_FRAMES && !this.isSpeechActive) {
+                    this.isSpeechActive = true;
+                    console.log(`[VAD Decision] VAD State: Speech STARTED (Hit ${this.activeFrames} frames > ${currentThreshold})`);
+                    this.silenceDetectionSubject.next(false);
+                }
+            } else {
+                this.activeFrames = 0; // Reset continuous frames (filters out sharp claps/coughs instantly)
+                this.silenceFramesCount++;
+
+                if (this.isSpeechActive && this.silenceFramesCount >= this.SILENCE_FRAMES) {
+                    this.isSpeechActive = false;
+                    console.log(`[VAD Decision] VAD State: Speech ENDED (Hit ${this.silenceFramesCount} silence frames < ${currentThreshold})`);
+                    this.silenceDetectionSubject.next(true);
+                }
+            }
+
+            this.vadFrameId = requestAnimationFrame(checkVAD);
+        };
+
+        this.isSpeechActive = false;
+        this.activeFrames = 0;
+        this.silenceFramesCount = 0;
+        this.vadFrameId = requestAnimationFrame(checkVAD);
+    }
+
+    private stopFFTVAD(): void {
+        if (this.vadFrameId) {
+            cancelAnimationFrame(this.vadFrameId);
+            this.vadFrameId = 0;
+        }
     }
 
     /** Whether audio capture is currently active */

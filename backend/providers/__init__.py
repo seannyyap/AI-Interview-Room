@@ -31,10 +31,10 @@ def get_llm_provider() -> LLMProvider:
         from backend.providers.cloud_llm import CloudLLMProvider
         logger.info("Using Cloud LLM provider (OpenAI)")
         return CloudLLMProvider()
-    elif settings.ai_backend == "ollama":
-        from backend.providers.ollama_llm import OllamaLLMProvider
-        logger.info("Using Ollama LLM provider")
-        return OllamaLLMProvider()
+    elif settings.ai_backend == "groq":
+        from backend.providers.groq_llm import GroqLLMProvider
+        logger.info("Using Groq LLM provider")
+        return GroqLLMProvider()
     else:
         from backend.providers.local_llm import LocalLLMProvider
         logger.info("Using Local LLM provider (llama-cpp-python)")

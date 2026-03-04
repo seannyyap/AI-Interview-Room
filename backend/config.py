@@ -8,9 +8,9 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # AI Backend
-    ai_backend: Literal["ollama", "local", "cloud"] = "ollama"
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "qwen2.5:14b"
+    ai_backend: Literal["local", "cloud", "groq"] = "groq"
+    groq_api_key: Optional[str] = None
+    groq_model: str = "llama-3.1-8b-instant"
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
 

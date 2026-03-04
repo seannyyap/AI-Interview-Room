@@ -9,6 +9,7 @@ import json
 import logging
 import re
 import time
+import random
 from uuid import uuid4
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -48,12 +49,14 @@ def _is_sentence_end(text: str) -> bool:
     return text.rstrip().endswith((".", "!", "?", ":", ";", ","))
 
 
-async def _send_tts_audio(websocket: WebSocket, tts_provider, text: str) -> None:
-    """Synthesize text and send TTS audio to the client. Swallows errors gracefully."""
+async def _send_tts_audio(websocket: WebSocket, tts_provider, text: str) -> float:
+    """Synthesize text and send TTS audio to the client. Returns synthesis time in ms."""
     if not text or not tts_provider.is_ready():
-        return
+        return 0
+    start = time.perf_counter()
     try:
         audio_bytes_out = await tts_provider.synthesize(text)
+        synthesis_ms = (time.perf_counter() - start) * 1000
         if audio_bytes_out:
             duration_ms = int(
                 len(audio_bytes_out) / 2  # 16-bit = 2 bytes/sample
@@ -64,8 +67,10 @@ async def _send_tts_audio(websocket: WebSocket, tts_provider, text: str) -> None
                 sample_rate=settings.tts_sample_rate,
             ).model_dump(by_alias=True))
             await websocket.send_bytes(audio_bytes_out)
+            return synthesis_ms
     except Exception as e:
         logger.warning(f"TTS synthesis failed (non-fatal): {e}")
+    return 0
 
 
 @router.websocket("/ws/audio")
@@ -112,10 +117,43 @@ async def websocket_endpoint(websocket: WebSocket):
 
         async def _run_response_pipeline(audio_data: np.ndarray):
             nonlocal current_response_task
+            
+            # 0. Setup TTS Worker Queue
+            tts_queue = asyncio.Queue()
+            
+            # --- Human Pacing Delay ---
+            # Simulate a 300ms–800ms "Listening/Planning" gap before starting processing
+            listening_delay = random.uniform(0.3, 0.8)
+            await asyncio.sleep(listening_delay)
+            
+            total_tts_ms = 0
+            
+            async def tts_worker():
+                """Background task to synthesize and send audio concurrently."""
+                nonlocal total_tts_ms
+                while True:
+                    sentence = await tts_queue.get()
+                    if sentence is None:  # Sentinel to stop worker
+                        tts_queue.task_done()
+                        break
+                    
+                    try:
+                        ms = await _send_tts_audio(websocket, tts_provider, sentence)
+                        total_tts_ms += ms
+                    except asyncio.CancelledError:
+                        break
+                    except Exception as e:
+                        logger.error(f"TTS worker error: {e}")
+                    finally:
+                        tts_queue.task_done()
+
+            tts_task = asyncio.create_task(tts_worker())
+
             try:
                 e2e_start = time.perf_counter()
 
                 # 1. STT — transcribe audio
+                stt_start = time.perf_counter()
                 try:
                     transcript = await stt_provider.transcribe(audio_data, 16000)
                 except Exception as e:
@@ -125,6 +163,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         message="Speech recognition failed."
                     ).model_dump(by_alias=True))
                     return
+                stt_ms = (time.perf_counter() - stt_start) * 1000
 
                 if not transcript or not transcript.strip():
                     # Reset client status if we filtered out noise
@@ -147,12 +186,18 @@ async def websocket_endpoint(websocket: WebSocket):
                 ).model_dump(by_alias=True))
 
                 # 4. LLM — generate response (streaming)
+                llm_start = time.perf_counter()
+                llm_ttft_ms = 0
+                
                 conversation.add_user_message(transcript)
                 full_ai_response = ""
                 tts_sentence_buffer = ""
 
                 try:
                     async for token in llm_provider.generate(conversation.get_history()):
+                        if llm_ttft_ms == 0:
+                            llm_ttft_ms = (time.perf_counter() - llm_start) * 1000
+                            
                         clean_token = _sanitize_llm_output(token)
                         full_ai_response += clean_token
                         tts_sentence_buffer += clean_token
@@ -166,7 +211,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             sentence = tts_sentence_buffer.strip()
                             tts_sentence_buffer = ""
                             if sentence:
-                                await _send_tts_audio(websocket, tts_provider, sentence)
+                                await tts_queue.put(sentence) # Non-blocking handoff to TTS worker
 
                 except asyncio.CancelledError:
                     logger.info(f"LLM generation cancelled for session {session_id}")
@@ -174,27 +219,49 @@ async def websocket_endpoint(websocket: WebSocket):
                 except Exception as e:
                     logger.error(f"LLM generation failed: {e}", exc_info=True)
                 
+                llm_total_ms = (time.perf_counter() - llm_start) * 1000
+
                 # Remaining TTS/Finish
                 if tts_sentence_buffer.strip():
-                    await _send_tts_audio(websocket, tts_provider, tts_sentence_buffer.strip())
+                    await tts_queue.put(tts_sentence_buffer.strip())
+                    
+                # 5. Tell TTS worker we are done producing sentences and wait for it to finish sending audio
+                await tts_queue.put(None)
+                await tts_task 
                     
                 if full_ai_response:
                     await interview_repo.save_message(interview_id, "ai", full_ai_response)
                     await db.commit()
                     conversation.add_assistant_message(full_ai_response)
 
+                total_e2e_ms = (time.perf_counter() - e2e_start) * 1000
+                
+                # Report accurate breakdown
+                stats_msg = {
+                    "type": "profiler-stats",
+                    "stt_ms": round(stt_ms),
+                    "llm_ttft_ms": round(llm_ttft_ms),
+                    "llm_total_ms": round(llm_total_ms),
+                    "tts_total_ms": round(total_tts_ms),
+                    "total_e2e_ms": round(total_e2e_ms)
+                }
+                logger.info(f"[Profiler] {stats_msg}")
+                await websocket.send_json(stats_msg)
+
                 await websocket.send_json(AIResponseMessage(
                     text="", is_complete=True
                 ).model_dump(by_alias=True))
-
-                e2e_ms = (time.perf_counter() - e2e_start) * 1000
-                logger.info(f"E2E Latency: {e2e_ms:.0f}ms")
             except asyncio.CancelledError:
-                logger.info(f"Response pipeline cancelled for session {session_id}")
+                logger.info(f"[Server Decision] Response pipeline CANCELLED (Barge-in detected) for session {session_id}")
+                raise
             except Exception as e:
                 logger.error(f"Response pipeline error: {e}", exc_info=True)
             finally:
                 current_response_task = None
+                
+                # Cleanup: ensure TTS background worker shuts down if pipeline was cancelled early
+                if not tts_task.done():
+                    tts_task.cancel()
 
         try:
             await websocket.send_json(
@@ -247,14 +314,9 @@ async def websocket_endpoint(websocket: WebSocket):
                                 _run_response_pipeline(full_buffer)
                             )
 
-                    elif cmd_type == "ai-interrupt":
-                        # Instant Barge-In!
-                        if current_response_task:
-                            logger.info(f"Interrupting AI for session {session_id}")
-                            current_response_task.cancel()
-                            current_response_task = None
-                        
-                        # Clear any lingering audio in the buffer just in case
+                    elif cmd_type == "speech-start":
+                        # User started a new utterance — clear the "ghost buffer" of old static/echo
+                        logger.info(f"[Server Decision] Speech-Start: Clearing ghost buffer for {session_id}")
                         audio_buffer.clear()
 
                     elif cmd_type == "interview-start":
@@ -286,10 +348,10 @@ async def websocket_endpoint(websocket: WebSocket):
                         # --- Initial Greeting ---
                         greeting_text = "Hello! I'm your AI interviewer today. Let's get started. Could you please introduce yourself and tell me a bit about your background?"
                         
-                        # Send text response
+                        # Send text response with is_complete=False to keep UI in PROCESSING
                         await websocket.send_json(AIResponseMessage(
                             text=greeting_text,
-                            is_complete=True
+                            is_complete=False
                         ).model_dump(by_alias=True))
                         
                         # Persist and Speak
@@ -297,6 +359,12 @@ async def websocket_endpoint(websocket: WebSocket):
                         await db.commit()
                         conversation.add_assistant_message(greeting_text)
                         await _send_tts_audio(websocket, tts_provider, greeting_text)
+                        
+                        # NOW send is_complete=True after audio has been streamed
+                        await websocket.send_json(AIResponseMessage(
+                            text="",
+                            is_complete=True
+                        ).model_dump(by_alias=True))
 
                     elif cmd_type == "interview-end":
                         if current_response_task:

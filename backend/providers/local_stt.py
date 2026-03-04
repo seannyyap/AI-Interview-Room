@@ -54,7 +54,7 @@ class LocalSTTProvider:
 
         logger.info(
             f"Loading faster-whisper model: size={self._model_size}, "
-            f"compute_type={self._compute_type}, device=cpu"
+            f"compute_type={self._compute_type}, device=auto"
         )
         start = time.perf_counter()
 
@@ -71,7 +71,7 @@ class LocalSTTProvider:
             partial(
                 WhisperModelClass,
                 self._model_size,
-                device="cpu",
+                device="auto",
                 compute_type=self._compute_type,
             ),
         )

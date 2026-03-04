@@ -39,6 +39,19 @@ export class AudioPlaybackService implements OnDestroy {
     }
 
     /**
+     * Unlock the AudioContext initialized by a user gesture.
+     * Prevents browser autoplay blocking.
+     */
+    async ensureUnlocked(): Promise<void> {
+        if (!this.audioContext || this.audioContext.state === 'closed') {
+            this.audioContext = new AudioContext({ sampleRate: this.sampleRate });
+        }
+        if (this.audioContext.state === 'suspended') {
+            await this.audioContext.resume().catch(e => console.warn('Failed to unlock audio context:', e));
+        }
+    }
+
+    /**
      * Enqueue raw PCM bytes for playback.
      * The bytes should be 16-bit signed integer, mono, at this.sampleRate.
      */
