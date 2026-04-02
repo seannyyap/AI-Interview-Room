@@ -1,0 +1,18 @@
+---
+description: Angular frontend—Signals, RxJS, injection, style
+globs: frontend/src/**/*.ts
+alwaysApply: false
+---
+
+# Frontend Angular
+
+- State: prefer Signals (`signal()`, `computed()`); streams: RxJS Observables. Inject services with `inject(Service)`.
+- WebSocket and audio contracts live in `shared/models/websocket.models.ts`; keep message types and camelCase in sync with backend schemas.
+- Style: single quotes, printWidth 100 (per project Prettier). Use Angular Material for UI where it fits.
+
+```typescript
+// Prefer
+readonly count = signal(0);
+readonly doubled = computed(() => this.count() * 2);
+private ws = inject(WebSocketService);
+```

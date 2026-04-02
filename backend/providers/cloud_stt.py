@@ -93,5 +93,5 @@ class CloudSTTProvider:
             .get("transcript", "")
         )
 
-        logger.info(f"Cloud STT transcribed in {elapsed_ms:.0f}ms: '{transcript[:80]}...'")
+        # logger.info(f"Cloud STT transcribed in {elapsed_ms:.0f}ms: '{transcript[:80]}...'")
         return transcript.strip()

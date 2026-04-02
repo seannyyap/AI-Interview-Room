@@ -1,0 +1,11 @@
+---
+description: WebSocket and audio message contract—preserve types and error codes
+globs: backend/routers/ws.py, frontend/src/**/websocket*.ts, frontend/src/**/audio*.ts
+alwaysApply: false
+---
+
+# API & WebSocket Contract
+
+- **Message types**: Client sends `speech-start`, `speech-end`, `interview-start`, `interview-end` + binary PCM. Server sends `status`, `transcript`, `ai-response`, `tts-audio` (then binary), `error`, `profiler-stats`. Do not rename or drop fields used by the other side.
+- **Error codes**: Use existing codes only—`PROVIDERS_NOT_READY`, `STT_ERROR`, `BUFFER_ERROR`, `INVALID_JSON`, `SERVER_ERROR`. Add new codes only when adding new failure modes; document in `docs/` or SKILL.
+- **CamelCase**: Backend schemas use `model_dump(by_alias=True)`; frontend expects camelCase (`isFinal`, `isComplete`, `focusAreas`). Keep `backend/models/schemas.py` and `frontend/.../websocket.models.ts` aligned.

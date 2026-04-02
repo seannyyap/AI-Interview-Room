@@ -28,12 +28,13 @@ export class AudioCaptureService implements OnDestroy {
     private readonly MAX_FREQ = 3000;  // Hz (Ignore high hiss/clicks)
     // --- Hysteresis Thresholds ---
     // Raised to 160 to safely clear the user's peak noise/echo floor (~118 seen in logs)
-    private readonly START_THRESHOLD = 160;
-    // Kept at 110 to ensure echo doesn't keep the VAD "active" forever
+    // Raised to 180 to ignore even more ambient noise/echo (User peak was 203)
+    private readonly START_THRESHOLD = 180;
+    // Kept at 110 for a wide hold window once speech is confirmed
     private readonly HOLD_THRESHOLD = 110;
 
-    // Increased to 10 (~166ms) to filter out sharp desk bumps/claps
-    private readonly REQUIRED_FRAMES = 10;
+    // Increased to 15 (~250ms) to ensure pops/bumps/clicks are ignored
+    private readonly REQUIRED_FRAMES = 15;
     private readonly SILENCE_FRAMES = 120; // ~2.0s for natural thinking/pause room
 
     private activeFrames = 0;
@@ -194,17 +195,18 @@ export class AudioCaptureService implements OnDestroy {
 
             // Calibration Telemetry: Log the peak energy every ~1 second (60 frames)
             if (this.vadFrameId % 60 === 0) {
-                console.log(`[VAD Telemetry] Peak: ${peakEnergy} | Avg: ${averageEnergy} | ActiveFrames: ${this.activeFrames}/${this.REQUIRED_FRAMES} | SilenceFrames: ${this.silenceFramesCount}/${this.SILENCE_FRAMES} | Threshold: ${currentThreshold}`);
+                // Telemetry removed to reduce console noise (Signal Optimization)
+                // console.log(`[VAD Telemetry] Peak: ${peakEnergy} | Avg: ${averageEnergy} | ActiveFrames: ${this.activeFrames}/${this.REQUIRED_FRAMES} | SilenceFrames: ${this.silenceFramesCount}/${this.SILENCE_FRAMES} | Threshold: ${currentThreshold}`);
             }
-
             if (peakEnergy > currentThreshold) {
                 this.activeFrames++;
                 this.silenceFramesCount = 0;
 
                 if (this.activeFrames >= this.REQUIRED_FRAMES && !this.isSpeechActive) {
                     this.isSpeechActive = true;
-                    console.log(`[VAD Decision] VAD State: Speech STARTED (Hit ${this.activeFrames} frames > ${currentThreshold})`);
+                    this.silenceFramesCount = 0;
                     this.silenceDetectionSubject.next(false);
+                    console.log(`[VAD Decision] Speech Started (Energy: ${peakEnergy} > ${currentThreshold})`);
                 }
             } else {
                 this.activeFrames = 0; // Reset continuous frames (filters out sharp claps/coughs instantly)
@@ -212,8 +214,10 @@ export class AudioCaptureService implements OnDestroy {
 
                 if (this.isSpeechActive && this.silenceFramesCount >= this.SILENCE_FRAMES) {
                     this.isSpeechActive = false;
-                    console.log(`[VAD Decision] VAD State: Speech ENDED (Hit ${this.silenceFramesCount} silence frames < ${currentThreshold})`);
+                    this.activeFrames = 0;
                     this.silenceDetectionSubject.next(true);
+                    const graceSecs = (this.SILENCE_FRAMES * 16.6 / 1000).toFixed(1);
+                    console.log(`[VAD Decision] Speech Ended (Grace period of ${graceSecs}s met)`);
                 }
             }
 

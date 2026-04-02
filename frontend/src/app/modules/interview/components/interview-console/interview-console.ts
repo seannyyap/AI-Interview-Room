@@ -1,7 +1,11 @@
-import { Component, ChangeDetectionStrategy, inject, OnDestroy, signal, effect } from '@angular/core';
+import {
+  Component, ChangeDetectionStrategy, inject, OnDestroy, AfterViewInit, signal, effect,
+} from '@angular/core';
 import { Subscription } from 'rxjs';
+import { Router } from '@angular/router';
 import { InterviewStore } from '../../interview.store';
 import { InterviewStatus, Role } from '../../../../shared/models/interview.model';
+import { ConnectionState } from '../../../../shared/models/websocket.models';
 import { AudioCaptureService } from '../../../../shared/services/audio-capture.service';
 import { WebSocketService } from '../../../../shared/services/websocket.service';
 import { AudioPlaybackService } from '../../../../shared/services/audio-playback.service';
@@ -13,7 +17,7 @@ import { AudioPlaybackService } from '../../../../shared/services/audio-playback
   styleUrl: './interview-console.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class InterviewConsoleComponent implements OnDestroy {
+export class InterviewConsoleComponent implements AfterViewInit, OnDestroy {
   readonly store = inject(InterviewStore);
   readonly InterviewStatus = InterviewStatus;
   showSettings = signal<boolean>(false);
@@ -41,6 +45,13 @@ export class InterviewConsoleComponent implements OnDestroy {
         this.textGenerationComplete = false; // Reset for next turn
       }
     });
+  }
+
+  async ngAfterViewInit(): Promise<void> {
+    if (!this.store.isMicrophoneActive()) {
+      await this.startCapture();
+      this.store.toggleCamera(true);
+    }
   }
 
   /**
@@ -164,6 +175,8 @@ export class InterviewConsoleComponent implements OnDestroy {
           if (!this.audioPlayback.isPlaying()) {
             this.store.setStatus(InterviewStatus.LISTENING);
           }
+          // Ensure any buffered audio is flushed now that text is done
+          this.audioPlayback.flush();
         } else {
           this.textGenerationComplete = false;
           this.store.setStatus(InterviewStatus.PROCESSING);
@@ -191,13 +204,16 @@ export class InterviewConsoleComponent implements OnDestroy {
           }
         } else {
           // Rule: User STARTS speaking (isSilent=false)
-          console.log('[Console Decision] Rule: Speech Start Detected -> sending speech-start to server to clear buffers');
-          this.wsService.sendMessage({ type: 'speech-start' });
+          // Only send speech-start if we are currently LISTENING (i.e., not already processing or speaking)
+          if (currentStatus === InterviewStatus.LISTENING) {
+            console.log('[Console Decision] Rule: Speech Start Detected -> sending speech-start to server to clear buffers');
+            this.wsService.sendMessage({ type: 'speech-start' });
+          }
         }
       });
 
       // Phase 4: Pipe WS errors to store
-      this.errorSub = this.wsService.error$.subscribe((msg) => {
+      this.errorSub = this.wsService.error$.subscribe((msg: any) => {
         this.store.setError(msg.message);
       });
     } catch (err) {

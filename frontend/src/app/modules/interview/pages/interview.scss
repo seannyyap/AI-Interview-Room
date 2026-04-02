@@ -4,8 +4,7 @@
 
 .interview-grid-layout {
     width: 100%;
-    /* Fill remaining height below header */
-    height: calc(100vh - var(--header-height));
+    height: 100vh;
     display: grid;
     /* Create a single massive cell */
     grid-template-columns: 1fr;
@@ -117,7 +116,7 @@
         overflow-y: auto;
         /* Enable vertical scrolling */
         height: auto;
-        min-height: calc(100vh - var(--header-height));
+        min-height: 100vh;
         padding-bottom: var(--spacing-lg);
     }
 
@@ -163,8 +162,7 @@
     transition: top 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 
     &.visible {
-        top: 90px;
-        /* Below the header */
+        top: 20px;
     }
 
     .error-content {

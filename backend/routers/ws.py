@@ -143,7 +143,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     except asyncio.CancelledError:
                         break
                     except Exception as e:
-                        logger.error(f"TTS worker error: {e}")
+                        logger.error(f"[{session_id}] TTS worker error: {e}")
                     finally:
                         tts_queue.task_done()
 
@@ -157,7 +157,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 try:
                     transcript = await stt_provider.transcribe(audio_data, 16000)
                 except Exception as e:
-                    logger.error(f"STT failed: {e}", exc_info=True)
+                    logger.error(f"[{session_id}] STT failed: {e}", exc_info=True)
                     await websocket.send_json(ErrorMessage(
                         code="STT_ERROR",
                         message="Speech recognition failed."
@@ -184,6 +184,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     text=transcript,
                     is_final=True
                 ).model_dump(by_alias=True))
+                logger.info(f"[{session_id}] User: {transcript}")
 
                 # 4. LLM — generate response (streaming)
                 llm_start = time.perf_counter()
@@ -217,7 +218,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     logger.info(f"LLM generation cancelled for session {session_id}")
                     raise
                 except Exception as e:
-                    logger.error(f"LLM generation failed: {e}", exc_info=True)
+                    logger.error(f"[{session_id}] LLM generation failed: {e}", exc_info=True)
                 
                 llm_total_ms = (time.perf_counter() - llm_start) * 1000
 
@@ -232,6 +233,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 if full_ai_response:
                     await interview_repo.save_message(interview_id, "ai", full_ai_response)
                     await db.commit()
+                    logger.info(f"[{session_id}] AI: {full_ai_response}")
                     conversation.add_assistant_message(full_ai_response)
 
                 total_e2e_ms = (time.perf_counter() - e2e_start) * 1000
@@ -245,7 +247,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     "tts_total_ms": round(total_tts_ms),
                     "total_e2e_ms": round(total_e2e_ms)
                 }
-                logger.info(f"[Profiler] {stats_msg}")
+                logger.info(f"[{session_id}] [Profiler] {stats_msg}")
                 await websocket.send_json(stats_msg)
 
                 await websocket.send_json(AIResponseMessage(

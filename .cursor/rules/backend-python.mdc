@@ -1,0 +1,21 @@
+---
+description: Python backend standards—async, typing, logging
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+# Backend Python
+
+- Use async/await for I/O; type hints on public functions and key args.
+- Logging: `logger = logging.getLogger(__name__)` (or `"ws"` in ws.py); use `logger.error(..., exc_info=True)` for exceptions.
+- Never use bare `except:`; catch specific exceptions or `Exception` and log/re-raise as appropriate.
+- Config and secrets from `backend.config.settings`; no hardcoded credentials.
+
+```python
+# Prefer
+try:
+    result = await some_async_call()
+except ConnectionError as e:
+    logger.warning("Connection failed: %s", e)
+    raise
+```

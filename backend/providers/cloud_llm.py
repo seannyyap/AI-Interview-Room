@@ -75,10 +75,10 @@ class CloudLLMProvider:
                 if first_token_time is None:
                     first_token_time = time.perf_counter()
                     ttft_ms = (first_token_time - start) * 1000
-                    logger.info(f"Cloud LLM time-to-first-token: {ttft_ms:.0f}ms")
+                    # logger.info(f"Cloud LLM time-to-first-token: {ttft_ms:.0f}ms")
 
                 token_count += 1
                 yield content
 
         total_ms = (time.perf_counter() - start) * 1000
-        logger.info(f"Cloud LLM generated {token_count} tokens in {total_ms:.0f}ms")
+        # logger.info(f"Cloud LLM generated {token_count} tokens in {total_ms:.0f}ms")
